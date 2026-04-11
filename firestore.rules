@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /favorites/{docId} {
+      // Only logged-in users can read their OWN favorites
+      allow read: if request.auth != null
+                  && resource.data.uid == request.auth.uid;
+
+      // Only logged-in users can create a favorite for themselves
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid;
+
+      // Only the owner can delete their favorite
+      allow delete: if request.auth != null
+                    && resource.data.uid == request.auth.uid;
+
+      // No updates allowed (delete + recreate instead)
+      allow update: if false;
+    }
+  }
+}
