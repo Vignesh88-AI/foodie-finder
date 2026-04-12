@@ -109,10 +109,14 @@ export default function Navbar({ user }) {
                         </div>
                       </div>
                     </div>
-                    <div className="px-4 py-2.5 flex items-center gap-2 text-sm text-gray-600 border-b border-gray-50">
-                      <FiHeart size={13} style={{ color: '#D85A30' }} />
-                      <span className="font-medium">{favCount}</span>
-                      <span className="text-gray-400">saved meals</span>
+                    <div className="px-3 py-2 mx-4 my-2 flex items-center gap-2 bg-white rounded-xl border border-gray-100">
+                      <FiHeart size={13} style={{ color:'#D85A30' }} />
+                      <span className="text-sm font-semibold text-gray-800">{favCount}</span>
+                      <span className="text-sm text-gray-400">meals saved</span>
+                      <button onClick={() => { navigate('/favorites'); setProfile(false) }}
+                        className="ml-auto text-xs font-semibold" style={{ color:'#D85A30' }}>
+                        View →
+                      </button>
                     </div>
                     {[
                       { to: '/profile',   icon: FiUser,        label: 'Profile & settings',  bg: 'bg-brand-50',  color: 'text-brand-500' },

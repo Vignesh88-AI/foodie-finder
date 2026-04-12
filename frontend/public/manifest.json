@@ -1,0 +1,13 @@
+{
+  "name": "Dishcovery",
+  "short_name": "Dishcovery",
+  "description": "Find meals from every cuisine — 300+ recipes, AI chef, nearby places",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FDF8F0",
+  "theme_color": "#D85A30",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

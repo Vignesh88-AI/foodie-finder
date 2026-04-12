@@ -139,13 +139,20 @@ export default function MealCard({ meal, isFavorite, onToggleFav }) {
           className="group-hover:text-brand-600 transition-colors">
           {meal.strMeal}
         </h3>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
           {meal.strArea && <span style={{ fontSize: 11, color: '#a8a29e' }}>{meal.strArea}</span>}
-          {meal.strCategory && (
-            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: '#FFF3EE', color: '#D85A30', fontWeight: 600 }}>
-              {meal.strCategory}
-            </span>
-          )}
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            {meal.calories > 0 && (
+              <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 99, background: '#f0fdf4', color: '#16a34a', fontWeight: 600 }}>
+                🔥 {meal.calories} kcal
+              </span>
+            )}
+            {meal.strCategory && (
+              <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 99, background: '#FFF3EE', color: '#D85A30', fontWeight: 600 }}>
+                {meal.strCategory}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </motion.div>

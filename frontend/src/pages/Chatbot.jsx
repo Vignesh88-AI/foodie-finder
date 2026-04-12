@@ -1,162 +1,267 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FiSend, FiRefreshCw, FiZap } from 'react-icons/fi'
+import { FiSend, FiRefreshCw, FiClock } from 'react-icons/fi'
+import { collection, query, where, getDocs } from 'firebase/firestore'
+import { db } from '../firebase'
 import FoodAvatar from '../components/FoodAvatar'
 
-// Groq API — free tier: 30 req/min, 14,400 req/day
-const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions'
-const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || ''
-const GROQ_MODEL = 'llama3-8b-8192' // free, fast
+const API = import.meta.env.VITE_API_URL
 
-const SYSTEM_PROMPT = `You are Chef Dish, a friendly and expert AI cooking assistant for Dishcovery — a recipe discovery app.
+// Build dynamic system prompt with user's favourites (#30)
+const buildSystemPrompt = (favs, userName) => `You are Chef Dish, a warm, witty, and expert AI cooking assistant for Dishcovery.
 
-You help users with:
-- Detailed recipes with step-by-step instructions and ingredients
-- Indian cuisine expertise (biryani, curries, street food, regional dishes)  
-- Cooking tips, techniques, and common mistake fixes
-- Ingredient substitutions when users don't have something
-- What to cook with ingredients they have on hand
-- Cuisine explanations and food culture
-- Calorie estimates and nutritional rough info
-- Fixing cooking problems (too spicy/salty/burnt/thick/thin etc)
+Your personality:
+- You're like a friendly head chef who loves teaching people to cook
+- You have opinions! Suggest confidently with enthusiasm
+- Use cooking metaphors naturally ("Let's get our mise en place sorted!")
+- Occasionally use food emojis 🍛🔥🧄 but don't overdo it
+- Be encouraging — never make the user feel bad about not knowing something
+- Address the user as ${userName || 'Chef'} occasionally to feel personal
 
-Response style:
-- Friendly, warm and encouraging
-- Use emojis sparingly but effectively
-- For recipes: always list ingredients first, then numbered steps
-- Keep answers focused and practical
-- For Indian dishes especially, be very detailed and authentic
-- If someone asks about calories, give a rough estimate per serving
+${favs.length > 0
+  ? `The user's saved favourite meals are: ${favs.join(', ')}. When they mention favourites, list them numbered and ask which to cook.`
+  : "The user hasn't saved any favourite meals yet. Encourage them to explore!"}
 
-Always stay focused on food and cooking topics. If asked about something unrelated, politely redirect to food.`
+You help with: detailed recipes with steps, Indian cuisine expertise, cooking tips, ingredient substitutions, what to cook with available ingredients, fixing cooking mistakes (too spicy/salty/burnt), calorie estimates, cuisine explanations, meal planning.
+
+Always stay focused on food and cooking. If asked something unrelated, redirect warmly: "Ha, I wish I could help with that — but I'm strictly a kitchen guy! 🍳 Now, what are we cooking?"`
+
+// Resolve "1", "2", "3" replies to actual favourite meal names (#30 Fix C)
+const resolveNumberedReply = (text, favs) => {
+  const num = parseInt(text.trim())
+  if (!isNaN(num) && num >= 1 && num <= favs.length) {
+    return `Tell me how to make ${favs[num - 1]}`
+  }
+  return text
+}
 
 const SUGGESTIONS = [
   '🍛 How do I make chole bhature?',
   '🥗 Easy vegetarian dinner tonight',
   '🌶️ My food is too spicy, how to fix?',
-  '🥘 I have chicken, onion, tomato — what can I cook?',
+  '🥘 I have chicken, onion and tomato — what can I cook?',
   '🍝 Quick pasta recipe under 20 minutes',
-  '🎂 Easy dessert for beginners',
+  '❤️ Help me cook my favourite meal',
 ]
 
-// Fallback rule-based for when Groq key not set
-function fallbackResponse(input) {
-  const msg = input.toLowerCase()
-  if (msg.includes('chole') || msg.includes('bhature')) return "🍛 **Chole Bhature** — A classic Punjabi dish!\n\n**For Chole:**\nIngredients: 2 cups chickpeas (soaked overnight), 2 onions, 3 tomatoes, 2 tsp chole masala, 1 tsp cumin, ginger-garlic paste, oil, salt\n\nSteps:\n1. Pressure cook chickpeas with tea bag (for colour) — 6-7 whistles\n2. Fry onions until dark golden. Add ginger-garlic paste.\n3. Add tomatoes + chole masala + spices. Cook 10 mins.\n4. Add chickpeas + 1 cup water. Simmer 20 mins.\n\n**For Bhature:**\nIngredients: 2 cups maida, ½ cup curd, ½ tsp baking soda, oil to fry\n\nSteps:\n1. Mix maida + curd + baking soda + pinch of salt. Knead soft dough.\n2. Rest 2 hours.\n3. Roll into thick circles, deep fry in hot oil until puffed.\n4. Serve immediately! 🎉"
-  if (msg.includes('spic')) return "🌶️ To reduce spice: add coconut milk, cream, or yoghurt. Add more tomatoes or a potato chunk (absorbs spice). A pinch of sugar also helps balance. Never add plain water — it spreads the heat!"
-  if (msg.includes('biryani')) return "🍛 Chicken Biryani recipe:\n\n**Ingredients:** 500g chicken, 2 cups basmati rice, 2 onions, 1 cup yoghurt, 4 tbsp biryani masala, 4 tbsp ghee, saffron in warm milk, mint leaves\n\n**Steps:**\n1. Marinate chicken in yoghurt + biryani masala for 1 hour\n2. Fry onions until golden brown\n3. Cook chicken until done\n4. Par-boil rice to 70% done\n5. Layer: rice → chicken → fried onions → mint. Repeat\n6. Pour saffron milk on top. Seal and cook on dum (low heat) 25 mins\n7. Serve with raita! 🎉"
-  if (msg.includes('chicken') && (msg.includes('have') || msg.includes('got'))) return "🍗 With chicken you can make:\n• **Butter Chicken** — creamy tomato curry\n• **Chicken Biryani** — aromatic rice dish\n• **Chicken Fried Rice** — quick 20-min meal\n• **Kadai Chicken** — dry restaurant-style curry\n• **Simple Chicken Curry** — onion-tomato base with garam masala\n\nWhich one would you like a recipe for?"
-  return `I can help you with recipes, cooking tips, and food questions! Try asking:\n• "How to make butter chicken"\n• "What can I cook with eggs and rice"\n• "My curry is too salty, help"\n• "Tell me about Indian street food"\n\nNote: Add your Groq API key in environment variables for full AI-powered responses!`
+// Simple markdown renderer — safe, no dangerouslySetInnerHTML (#2)
+function SafeMarkdown({ content }) {
+  const lines = content.split('\n')
+  return (
+    <div style={{ fontSize: 14, lineHeight: 1.65, color: 'inherit' }}>
+      {lines.map((line, i) => {
+        if (!line.trim()) return <div key={i} style={{ height: 8 }} />
+        // Bold **text**
+        const parts = line.split(/\*\*(.*?)\*\*/g)
+        const rendered = parts.map((p, j) => j % 2 === 1 ? <strong key={j}>{p}</strong> : p)
+        // Numbered list
+        if (/^\d+\./.test(line.trim())) {
+          return <div key={i} style={{ display:'flex', gap:8, marginBottom:4 }}>
+            <span style={{ fontWeight:700, minWidth:20, color:'#D85A30' }}>{line.match(/^\d+/)[0]}.</span>
+            <span>{parts.map((p,j) => j%2===1 ? <strong key={j}>{p}</strong> : p)}</span>
+          </div>
+        }
+        // Bullet
+        if (line.trim().startsWith('•') || line.trim().startsWith('-') || line.trim().startsWith('*')) {
+          const txt = line.trim().replace(/^[•\-\*]\s*/,'')
+          const tparts = txt.split(/\*\*(.*?)\*\*/g)
+          return <div key={i} style={{ display:'flex', gap:8, marginBottom:3 }}>
+            <span style={{ color:'#D85A30', fontWeight:700, marginTop:1 }}>•</span>
+            <span>{tparts.map((p,j) => j%2===1 ? <strong key={j}>{p}</strong> : p)}</span>
+          </div>
+        }
+        return <p key={i} style={{ marginBottom:6 }}>{rendered}</p>
+      })}
+    </div>
+  )
 }
 
 export default function Chatbot({ user }) {
-  const [messages, setMessages] = useState([{
-    role: 'assistant',
-    content: `Hey ${user?.displayName?.split(' ')[0] || 'there'}! 👋 I'm **Chef Dish**, your AI cooking assistant.\n\nAsk me anything — recipes, cooking tips, calories, or what to make with ingredients you have. I know Indian, Italian, Chinese, Thai and all world cuisines! 🍽️${!GROQ_KEY ? '\n\n*(Add VITE_GROQ_API_KEY to .env for full AI responses)*' : ''}`
-  }])
-  const [input, setInput]     = useState('')
-  const [loading, setLoading] = useState(false)
+  const userName = user?.displayName?.split(' ')[0] || 'Chef'
+  const [userFavs, setUserFavs] = useState([])
+  const [messages, setMessages] = useState([])
+  const [sessions, setSessions] = useState([])
+  const [showSessions, setShowSessions] = useState(false)
+  const [input, setInput]       = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [groqAvailable, setGroqAvailable] = useState(null)
   const bottomRef = useRef(null)
   const inputRef  = useRef(null)
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+  const welcomeMsg = {
+    role: 'assistant',
+    content: `Hey ${userName}! 👋 I'm **Chef Dish**, your AI cooking assistant.\n\nAsk me anything — recipes, cooking tips, or what to make with ingredients you have. I know Indian, Italian, Chinese, Thai and all world cuisines!`
+  }
+
+  // Load favourites from Firestore (#30)
+  useEffect(() => {
+    if (!user) return
+    getDocs(query(collection(db,'favorites'), where('uid','==',user.uid)))
+      .then(snap => setUserFavs(snap.docs.map(d => d.data().strMeal)))
+  }, [user])
+
+  // Check if Groq is available
+  useEffect(() => {
+    fetch(`${API}/api/health`).then(r=>r.json()).then(d=>{
+      // We'll know after first message, but set optimistic
+      setGroqAvailable(true)
+    }).catch(()=>setGroqAvailable(false))
+  }, [])
+
+  // Load saved chat history (#31)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('chefDishHistory')
+      const savedSessions = localStorage.getItem('chefDishSessions')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed.length > 1) { setMessages(parsed); return }
+      }
+      if (savedSessions) setSessions(JSON.parse(savedSessions))
+    } catch {}
+    setMessages([welcomeMsg])
+  }, [])
+
+  // Save history on every message update (#31)
+  useEffect(() => {
+    if (messages.length > 1) {
+      localStorage.setItem('chefDishHistory', JSON.stringify(messages.slice(-50)))
+    }
+    bottomRef.current?.scrollIntoView({ behavior:'smooth' })
+  }, [messages])
+
+  // Save sessions list (#31)
+  const saveSession = (msgs) => {
+    try {
+      const existing = JSON.parse(localStorage.getItem('chefDishSessions')||'[]')
+      const lastUserMsg = [...msgs].reverse().find(m=>m.role==='user')
+      const newSession = {
+        id: Date.now(),
+        preview: lastUserMsg?.content?.slice(0,55)+'…' || 'Chat session',
+        date: new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short'}),
+        messages: msgs
+      }
+      const updated = [newSession,...existing].slice(0,5)
+      localStorage.setItem('chefDishSessions', JSON.stringify(updated))
+      setSessions(updated)
+    } catch {}
+  }
+
+  const clearChat = () => {
+    if (messages.length > 1) saveSession(messages)
+    localStorage.removeItem('chefDishHistory')
+    setMessages([welcomeMsg])
+    setShowSessions(false)
+  }
+
+  const restoreSession = (session) => {
+    setMessages(session.messages)
+    localStorage.setItem('chefDishHistory', JSON.stringify(session.messages))
+    setShowSessions(false)
+  }
 
   const sendMessage = async (text) => {
-    const userText = (text || input).trim()
+    let userText = (text || input).trim()
     if (!userText || loading) return
+    // Resolve numbered reply to favourite meal name
+    userText = resolveNumberedReply(userText, userFavs)
     setInput('')
-    const newMessages = [...messages, { role: 'user', content: userText }]
+
+    const newMessages = [...messages, { role:'user', content: text||userText }]
     setMessages(newMessages)
     setLoading(true)
 
-    // Use Groq if key available, else fallback
-    if (GROQ_KEY) {
-      try {
-        const res = await fetch(GROQ_API, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${GROQ_KEY}`,
-          },
-          body: JSON.stringify({
-            model: GROQ_MODEL,
-            messages: [
-              { role: 'system', content: SYSTEM_PROMPT },
-              ...newMessages.map(m => ({ role: m.role, content: m.content })),
-            ],
-            max_tokens: 1024,
-            temperature: 0.7,
-          }),
-        })
-        const data = await res.json()
-        const reply = data.choices?.[0]?.message?.content || "I had trouble responding. Please try again!"
-        setMessages(prev => [...prev, { role: 'assistant', content: reply }])
-      } catch {
-        setMessages(prev => [...prev, { role: 'assistant', content: "Connection error. Please try again! 🙏" }])
-      }
-    } else {
-      // Fallback with delay for natural feel
-      await new Promise(r => setTimeout(r, 700 + Math.random() * 500))
-      const reply = fallbackResponse(userText)
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }])
+    // Build messages array for API (exclude welcome msg content, keep role/content)
+    const apiMessages = [
+      { role:'system', content: buildSystemPrompt(userFavs, userName) },
+      ...newMessages.map(m => ({ role:m.role, content:m.content }))
+    ]
+
+    try {
+      // Call backend which holds the Groq key securely (#1 fix)
+      const res = await fetch(`${API}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ messages: apiMessages.slice(1) }) // skip system in array, backend adds it
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setMessages(prev => [...prev, { role:'assistant', content: data.reply }])
+      setGroqAvailable(true)
+    } catch (err) {
+      console.error('Chat error:', err)
+      // Fallback to rule-based
+      const reply = fallback(userText, userFavs)
+      setMessages(prev => [...prev, { role:'assistant', content: reply }])
+      setGroqAvailable(false)
+    } finally {
+      setLoading(false)
+      inputRef.current?.focus()
     }
-    setLoading(false)
-    inputRef.current?.focus()
   }
-
-  const clearChat = () => setMessages([{
-    role: 'assistant',
-    content: `Fresh start! 👨‍🍳 Ask me anything about cooking, recipes, or food. I'm here to help!`
-  }])
-
-  const renderText = (text) => text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n\n/g, '</p><p style="margin-top:8px">')
-    .replace(/\n/g, '<br/>')
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'calc(100vh - 64px)', background:'#f9fafb' }}>
       {/* Header */}
-      <div style={{ background:'linear-gradient(135deg, #065f46 0%, #059669 100%)', padding:'16px 24px', flexShrink:0 }}>
+      <div style={{ background:'linear-gradient(135deg,#7c3d12 0%,#c2410c 50%,#D85A30 100%)', padding:'14px 24px', flexShrink:0 }}>
         <div style={{ maxWidth:720, margin:'0 auto', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <div style={{ width:48, height:48, borderRadius:16, background:'rgba(255,255,255,0.2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24 }}>👨‍🍳</div>
+            <div style={{ width:44,height:44,borderRadius:14,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22 }}>👨‍🍳</div>
             <div>
-              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                <span style={{ fontWeight:700, color:'white', fontSize:16 }}>Chef Dish</span>
-                {GROQ_KEY && (
-                  <span style={{ background:'rgba(255,255,255,0.2)', color:'white', fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:99, display:'flex', alignItems:'center', gap:4 }}>
-                    <FiZap size={9} /> AI Powered
-                  </span>
-                )}
-              </div>
-              <div style={{ color:'rgba(255,255,255,0.65)', fontSize:12 }}>
-                {GROQ_KEY ? 'Powered by Groq AI · Llama 3' : 'Smart cooking assistant'}
+              <div>
+                <span style={{ fontWeight:700,color:'white',fontSize:16 }}>Chef Dish 👨‍🍳</span>
+                <div style={{ color:'rgba(255,255,255,0.65)',fontSize:12 }}>
+                  Your personal cooking assistant{userFavs.length>0?` · Knows your ${userFavs.length} saved meals`:''}
+                </div>
               </div>
             </div>
           </div>
-          <button onClick={clearChat}
-            style={{ background:'rgba(255,255,255,0.12)', border:'none', color:'rgba(255,255,255,0.8)', borderRadius:12, padding:'6px 14px', cursor:'pointer', fontSize:13, fontWeight:600, display:'flex', alignItems:'center', gap:6 }}>
-            <FiRefreshCw size={13} /> New chat
-          </button>
+          <div style={{ display:'flex',gap:8 }}>
+            {sessions.length>0 && (
+              <button onClick={()=>setShowSessions(!showSessions)}
+                style={{ background:'rgba(255,255,255,0.12)',border:'none',color:'rgba(255,255,255,0.8)',borderRadius:10,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:600,display:'flex',alignItems:'center',gap:5 }}>
+                <FiClock size={12}/> History
+              </button>
+            )}
+            <button onClick={clearChat}
+              style={{ background:'rgba(255,255,255,0.12)',border:'none',color:'rgba(255,255,255,0.8)',borderRadius:10,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:600,display:'flex',alignItems:'center',gap:5 }}>
+              <FiRefreshCw size={12}/> New chat
+            </button>
+          </div>
         </div>
+
+        {/* Session history dropdown (#31) */}
+        <AnimatePresence>
+          {showSessions && (
+            <motion.div initial={{ opacity:0,y:-8 }} animate={{ opacity:1,y:0 }} exit={{ opacity:0,y:-8 }}
+              style={{ maxWidth:720,margin:'10px auto 0',background:'rgba(0,0,0,0.3)',borderRadius:14,overflow:'hidden' }}>
+              {sessions.map(s => (
+                <button key={s.id} onClick={()=>restoreSession(s)}
+                  style={{ width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 16px',background:'transparent',border:'none',cursor:'pointer',color:'white',fontSize:13,textAlign:'left',borderBottom:'1px solid rgba(255,255,255,0.1)' }}>
+                  <span style={{ opacity:0.85,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{s.preview}</span>
+                  <span style={{ opacity:0.5,fontSize:11,flexShrink:0,marginLeft:8 }}>{s.date}</span>
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Messages */}
-      <div style={{ flex:1, overflowY:'auto', padding:'24px 16px' }}>
-        <div style={{ maxWidth:720, margin:'0 auto', display:'flex', flexDirection:'column', gap:16 }}>
+      <div style={{ flex:1,overflowY:'auto',padding:'20px 16px' }}>
+        <div style={{ maxWidth:720,margin:'0 auto',display:'flex',flexDirection:'column',gap:14 }}>
 
           {/* Suggestion chips */}
-          {messages.length === 1 && (
-            <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.3 }}>
-              <p style={{ fontSize:12, fontWeight:600, color:'#9ca3af', textAlign:'center', marginBottom:12, textTransform:'uppercase', letterSpacing:'0.06em' }}>Try asking</p>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px,1fr))', gap:8 }}>
-                {SUGGESTIONS.map((s, i) => (
-                  <motion.button key={i} initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }}
-                    transition={{ delay:0.35 + i*0.05 }}
-                    whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
-                    onClick={() => sendMessage(s.replace(/^[^\s]+\s/, ''))}
-                    style={{ textAlign:'left', padding:'10px 14px', background:'white', border:'1px solid #e5e7eb', borderRadius:14, fontSize:13, color:'#374151', cursor:'pointer' }}>
+          {messages.length <= 1 && (
+            <motion.div initial={{ opacity:0,y:16 }} animate={{ opacity:1,y:0 }} transition={{ delay:0.3 }}>
+              <p style={{ fontSize:11,fontWeight:600,color:'#9ca3af',textAlign:'center',marginBottom:10,textTransform:'uppercase',letterSpacing:'0.06em' }}>Try asking</p>
+              <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:8 }}>
+                {SUGGESTIONS.map((s,i) => (
+                  <motion.button key={i} initial={{ opacity:0,y:8 }} animate={{ opacity:1,y:0 }}
+                    transition={{ delay:0.35+i*0.05 }} whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
+                    onClick={() => sendMessage(s.replace(/^[^\s]+\s/,''))}
+                    style={{ textAlign:'left',padding:'10px 14px',background:'white',border:'1px solid #e5e7eb',borderRadius:14,fontSize:13,color:'#374151',cursor:'pointer' }}>
                     {s}
                   </motion.button>
                 ))}
@@ -165,78 +270,86 @@ export default function Chatbot({ user }) {
           )}
 
           <AnimatePresence>
-            {messages.map((msg, i) => (
+            {messages.map((msg,i) => (
               <motion.div key={i}
-                initial={{ opacity:0, y:10, scale:0.98 }} animate={{ opacity:1, y:0, scale:1 }}
+                initial={{ opacity:0,y:10,scale:0.98 }} animate={{ opacity:1,y:0,scale:1 }}
                 transition={{ duration:0.3 }}
-                style={{ display:'flex', gap:10, flexDirection:msg.role==='user' ? 'row-reverse' : 'row' }}>
-                <div style={{ flexShrink:0, marginTop:4 }}>
-                  {msg.role === 'assistant'
-                    ? <div style={{ width:32, height:32, borderRadius:12, background:'#d1fae5', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>👨‍🍳</div>
-                    : <FoodAvatar user={user} size={32} />
-                  }
+                style={{ display:'flex',gap:10,flexDirection:msg.role==='user'?'row-reverse':'row' }}>
+                <div style={{ flexShrink:0,marginTop:4 }}>
+                  {msg.role==='assistant'
+                    ? <div style={{ width:32,height:32,borderRadius:12,background:'#d1fae5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16 }}>👨‍🍳</div>
+                    : <FoodAvatar user={user} size={32} />}
                 </div>
                 <div style={{
-                  maxWidth:'78%', padding:'12px 16px', borderRadius:20, fontSize:14, lineHeight:1.65,
-                  background: msg.role==='user' ? '#D85A30' : 'white',
-                  color: msg.role==='user' ? 'white' : '#1f2937',
-                  borderTopRightRadius: msg.role==='user' ? 4 : 20,
-                  borderTopLeftRadius: msg.role==='user' ? 20 : 4,
-                  boxShadow: msg.role==='assistant' ? '0 1px 8px rgba(0,0,0,0.06)' : 'none',
-                  border: msg.role==='assistant' ? '1px solid #f3f4f6' : 'none',
+                  maxWidth:'78%',padding:'12px 16px',borderRadius:20,
+                  background:msg.role==='user'?'#D85A30':'white',
+                  color:msg.role==='user'?'white':'#1f2937',
+                  borderTopRightRadius:msg.role==='user'?4:20,
+                  borderTopLeftRadius:msg.role==='user'?20:4,
+                  boxShadow:msg.role==='assistant'?'0 1px 8px rgba(0,0,0,0.06)':'none',
+                  border:msg.role==='assistant'?'1px solid #f3f4f6':'none',
                 }}>
-                  <div dangerouslySetInnerHTML={{ __html:`<p>${renderText(msg.content)}</p>` }} />
+                  {/* Safe markdown rendering — no dangerouslySetInnerHTML (#2) */}
+                  <SafeMarkdown content={msg.content} />
                 </div>
               </motion.div>
             ))}
           </AnimatePresence>
 
           {loading && (
-            <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }}
-              style={{ display:'flex', gap:10 }}>
-              <div style={{ width:32, height:32, borderRadius:12, background:'#d1fae5', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>👨‍🍳</div>
-              <div style={{ background:'white', border:'1px solid #f3f4f6', borderRadius:'20px 20px 20px 4px', padding:'12px 16px', boxShadow:'0 1px 8px rgba(0,0,0,0.06)', display:'flex', alignItems:'center', gap:6 }}>
-                {[0,1,2].map(i => (
-                  <motion.div key={i} animate={{ scale:[1,1.5,1], opacity:[0.4,1,0.4] }}
-                    transition={{ duration:0.8, repeat:Infinity, delay:i*0.15 }}
-                    style={{ width:8, height:8, borderRadius:'50%', background:'#9ca3af' }} />
+            <motion.div initial={{ opacity:0,y:8 }} animate={{ opacity:1,y:0 }}
+              style={{ display:'flex',gap:10 }}>
+              <div style={{ width:32,height:32,borderRadius:12,background:'#d1fae5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0 }}>👨‍🍳</div>
+              <div style={{ background:'white',border:'1px solid #f3f4f6',borderRadius:'20px 20px 20px 4px',padding:'12px 16px',display:'flex',alignItems:'center',gap:6 }}>
+                {[0,1,2].map(i=>(
+                  <motion.div key={i} animate={{ scale:[1,1.5,1],opacity:[0.4,1,0.4] }}
+                    transition={{ duration:0.8,repeat:Infinity,delay:i*0.15 }}
+                    style={{ width:8,height:8,borderRadius:'50%',background:'#9ca3af' }}/>
                 ))}
               </div>
             </motion.div>
           )}
-          <div ref={bottomRef} />
+          <div ref={bottomRef}/>
         </div>
       </div>
 
       {/* Input */}
-      <div style={{ background:'white', borderTop:'1px solid #f3f4f6', padding:'12px 16px', flexShrink:0 }}>
-        <div style={{ maxWidth:720, margin:'0 auto', display:'flex', gap:10, alignItems:'flex-end' }}>
-          <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+      <div style={{ background:'white',borderTop:'1px solid #f3f4f6',padding:'12px 16px',flexShrink:0 }}>
+        <div style={{ maxWidth:720,margin:'0 auto',display:'flex',gap:10,alignItems:'flex-end' }}>
+          <textarea ref={inputRef} value={input} onChange={e=>setInput(e.target.value)}
+            onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage()} }}
             placeholder="Ask Chef Dish anything about cooking…"
-            rows={1} style={{
-              flex:1, border:'1.5px solid #e5e7eb', borderRadius:16, padding:'12px 16px',
-              fontSize:14, outline:'none', resize:'none', minHeight:48, maxHeight:120,
-              lineHeight:1.5, fontFamily:'inherit', background:'#fafafa',
-            }}
-            onFocus={e => e.target.style.borderColor='#059669'}
-            onBlur={e => e.target.style.borderColor='#e5e7eb'} />
-          <motion.button whileTap={{ scale:0.88 }} onClick={() => sendMessage()}
-            disabled={!input.trim() || loading}
-            style={{
-              width:48, height:48, borderRadius:14, border:'none', cursor:'pointer',
-              background: input.trim() ? '#059669' : '#e5e7eb',
-              color:'white', display:'flex', alignItems:'center', justifyContent:'center',
-              transition:'all .15s', flexShrink:0,
-              boxShadow: input.trim() ? '0 4px 12px rgba(5,150,105,0.3)' : 'none',
-            }}>
-            <FiSend size={18} />
+            rows={1} style={{ flex:1,border:'1.5px solid #e5e7eb',borderRadius:16,padding:'12px 16px',fontSize:14,outline:'none',resize:'none',minHeight:48,maxHeight:120,lineHeight:1.5,fontFamily:'inherit',background:'#fafafa' }}
+            onFocus={e=>e.target.style.borderColor='#D85A30'}
+            onBlur={e=>e.target.style.borderColor='#e5e7eb'}/>
+          <motion.button whileTap={{ scale:0.88 }} onClick={()=>sendMessage()} disabled={!input.trim()||loading}
+            style={{ width:48,height:48,borderRadius:14,border:'none',cursor:'pointer',background:input.trim()?'#D85A30':'#e5e7eb',color:'white',display:'flex',alignItems:'center',justifyContent:'center',transition:'all .15s',flexShrink:0,boxShadow:input.trim()?'0 4px 12px rgba(216,90,48,0.3)':'none' }}>
+            <FiSend size={18}/>
           </motion.button>
         </div>
-        <p style={{ textAlign:'center', fontSize:11, color:'#9ca3af', marginTop:6 }}>
-          {GROQ_KEY ? 'Powered by Groq AI (Llama 3) · Free · Fast' : 'Add VITE_GROQ_API_KEY to .env for full AI · Enter to send'}
+        <p style={{ textAlign:'center',fontSize:11,color:'#9ca3af',marginTop:6 }}>
+          Enter to send · Shift+Enter for new line · Add GROQ_API_KEY to Render for full AI
         </p>
       </div>
     </div>
   )
+}
+
+// Fallback when Groq unavailable
+function fallback(msg, favs) {
+  const m = msg.toLowerCase()
+  if (/^(hi|hello|hey)\b/.test(m)) return "Hey there! 👋 Ask me for a recipe, cooking help, or what to make with ingredients you have!"
+  if (m.includes('favourite') || m.includes('favorite') || m.includes('saved')) {
+    if (favs.length===0) return "You haven't saved any favourite meals yet! Go to the Home page, explore some dishes, and tap ❤️ to save them. Then I can help you cook them! 🍽️"
+    if (favs.length===1) return `Your saved meal is **${favs[0]}**! Want me to walk you through how to make it?`
+    return `You have ${favs.length} saved meals:\n${favs.map((f,i)=>`${i+1}. ${f}`).join('\n')}\n\nWhich one shall we cook today? Just reply with the number!`
+  }
+  if (m.includes('biryani')) return "🍛 **Chicken Biryani:**\n\n**Ingredients:** 500g chicken, 2 cups basmati rice, 2 onions (sliced), 1 cup yoghurt, 4 tbsp biryani masala, 4 tbsp ghee, saffron in warm milk, mint leaves\n\n**Steps:**\n1. Marinate chicken in yoghurt + biryani masala for 1 hour\n2. Fry onions until deep golden brown\n3. Cook chicken until done\n4. Par-boil rice to 70% done, drain\n5. Layer: rice → chicken → fried onions → mint\n6. Pour saffron milk on top, seal with foil\n7. Cook on dum (low heat) 25 mins\n8. Serve with raita! 🎉"
+  if (m.includes('chole') || m.includes('bhature') || m.includes('chana')) return "🍛 **Chole Bhature:**\n\n**For Chole:**\n1. Soak 2 cups chickpeas overnight, pressure cook 6-7 whistles\n2. Fry onions golden, add ginger-garlic paste\n3. Add tomatoes + chole masala + cumin. Cook 10 mins\n4. Add chickpeas + water. Simmer 20 mins\n\n**For Bhature:**\n1. Mix 2 cups maida + ½ cup curd + ½ tsp baking soda + salt. Knead soft dough\n2. Rest 2 hours\n3. Roll thick circles, deep fry in hot oil until puffed\n4. Serve immediately! 🎉"
+  if (m.includes('spic')) return "🌶️ Food too spicy? Add coconut milk, cream or yoghurt. A potato chunk absorbs spice. A pinch of sugar helps balance. Never add plain water!"
+  if (m.includes('salt')) return "🧂 Too salty? Add a potato chunk and simmer — it absorbs salt. Or add cream/coconut milk to mellow it out."
+  if (m.includes('burnt')) return "🔥 Transfer immediately to a clean pot without scraping the bottom. Add liquid and continue — usually salvageable!"
+  if (m.includes('chicken') && (m.includes('have')||m.includes('got'))) return "🍗 With chicken you can make:\n1. Butter Chicken — creamy tomato curry\n2. Chicken Biryani — aromatic rice dish\n3. Chicken Fried Rice — 20-min weeknight meal\n4. Kadai Chicken — dry restaurant-style\n\nWhich one? Reply with the number!"
+  if (m.includes('paneer')) return "🧀 **Quick Paneer Butter Masala:**\n1. Fry 250g paneer cubes until golden\n2. Blend onion+tomato+cashew paste, cook 8 mins\n3. Add butter + cream + kasuri methi\n4. Add paneer, simmer 5 mins\n5. Serve with naan or roti! 🫓"
+  return `I'm Chef Dish! Here's what I can help with:\n\n• **Recipes** — "How to make butter chicken"\n• **Cooking fixes** — "My food is too salty"\n• **Ingredient ideas** — "I have eggs and rice"\n• **Favourites** — "Help me cook my favourite meal"\n\n*(Add GROQ_API_KEY to Render for full AI responses)*`
 }

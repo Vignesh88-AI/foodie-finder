@@ -10,6 +10,18 @@ import MealCard from '../components/MealCard'
 import toast from 'react-hot-toast'
 import { FiArrowLeft } from 'react-icons/fi'
 
+function SkeletonCard() {
+  return (
+    <div className="rounded-2xl overflow-hidden bg-white animate-pulse shadow-sm border border-gray-100">
+      <div className="h-48 bg-gray-200" />
+      <div className="p-3.5 space-y-2">
+        <div className="h-4 bg-gray-200 rounded w-3/4" />
+        <div className="h-3 bg-gray-100 rounded w-1/2" />
+      </div>
+    </div>
+  )
+}
+
 export default function Favorites({ user }) {
   const [favorites, setFavorites] = useState([])
   const [favMap, setFavMap]       = useState({})  // { idMeal: docId }
@@ -45,11 +57,7 @@ export default function Favorites({ user }) {
   // Not used on this page (all are already fav) but MealCard requires it
   const toggleFav = (meal) => removeFav(meal)
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="w-10 h-10 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
+
 
   return (
     <div className="min-h-screen bg-gray-50 pb-16">
@@ -58,7 +66,7 @@ export default function Favorites({ user }) {
         {/* Header */}
         <div className="mb-8">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/home')}
             className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-4 transition-colors"
           >
             <FiArrowLeft size={16} />
@@ -72,6 +80,13 @@ export default function Favorites({ user }) {
           </p>
         </div>
 
+        {/* Skeleton loading */}
+        {loading && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Array.from({length:8}).map((_,i) => <SkeletonCard key={i} />)}
+          </div>
+        )}
+
         {/* Empty state */}
         {favorites.length === 0 && (
           <motion.div
@@ -84,7 +99,7 @@ export default function Favorites({ user }) {
             <p className="text-gray-400 max-w-xs mb-6">
               Start exploring and tap the heart on any meal to save it here.
             </p>
-            <button onClick={() => navigate('/')} className="btn-primary">
+            <button onClick={() => navigate('/home')} className="btn-primary">
               Browse meals
             </button>
           </motion.div>

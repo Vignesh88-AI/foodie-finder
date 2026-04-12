@@ -387,50 +387,51 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── DARK CTA ─────────────────────────────────────────── */}
-      <section style={{ padding:'96px 24px', background:C.dark, position:'relative', overflow:'hidden' }}>
-        <motion.div animate={{ scale:[1,1.2,1], opacity:[0.08,0.16,0.08] }} transition={{ duration:10, repeat:Infinity }}
-          style={{ position:'absolute', top:-100, right:-100, width:500, height:500, background:C.primary, borderRadius:'50%', filter:'blur(90px)', pointerEvents:'none' }} />
-        <motion.div animate={{ scale:[1,1.1,1], opacity:[0.06,0.12,0.06] }} transition={{ duration:13, repeat:Infinity, delay:4 }}
-          style={{ position:'absolute', bottom:-80, left:-80, width:400, height:400, background:C.accent, borderRadius:'50%', filter:'blur(90px)', pointerEvents:'none' }} />
-
-        <Reveal style={{ maxWidth:600, margin:'0 auto', textAlign:'center', position:'relative' }}>
-          <div style={{ fontSize:52, marginBottom:16 }}>🍽</div>
-          <h2 style={{ fontFamily:SERIF, fontSize:'clamp(30px,4vw,52px)', fontWeight:800, color:'white', marginBottom:14 }}>
-            Ready to find your next favourite meal?
-          </h2>
-          <p style={{ fontSize:17, color:'rgba(255,255,255,0.48)', marginBottom:40, lineHeight:1.7 }}>
-            Free forever. No ads. No credit card. Just great food.
+      {/* ── CTA — redesigned (#17) ──────────────────────────────── */}
+      <section style={{ background:'linear-gradient(135deg,#993C1D 0%,#D85A30 100%)', padding:'96px 24px', position:'relative', overflow:'hidden', textAlign:'center' }}>
+        {/* Floating food decorations */}
+        {['🍛','🍝','🍣','🌮','🍜','🥘'].map((e,i)=>(
+          <span key={i} style={{ position:'absolute', fontSize:'clamp(32px,5vw,56px)', opacity:0.12, top:`${15+i*12}%`, left:`${8+i*14}%`, pointerEvents:'none', userSelect:'none' }}>{e}</span>
+        ))}
+        <motion.div initial={{ opacity:0,y:30 }} whileInView={{ opacity:1,y:0 }} viewport={{ once:true }}
+          style={{ position:'relative', maxWidth:600, margin:'0 auto' }}>
+          <p style={{ color:'rgba(255,255,255,0.75)', fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.14em', marginBottom:16 }}>
+            Join thousands of food lovers
           </p>
-
-          {/* Checklist */}
-          <div style={{ display:'flex', flexWrap:'wrap', gap:'10px 24px', justifyContent:'center', marginBottom:40 }}>
-            {['300+ recipes','25+ cuisines','Veg & Non-Veg tags','Nearby places','AI Chef guide'].map(item => (
-              <div key={item} style={{ display:'flex', alignItems:'center', gap:6, fontSize:13, color:'rgba(255,255,255,0.65)' }}>
-                <FiCheck size={14} color={C.accent} /> {item}
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
-            <Link to="/signup" style={{
-              display:'inline-flex', alignItems:'center', gap:8,
-              fontWeight:700, fontSize:16, padding:'14px 36px', borderRadius:16,
-              background:C.primary, color:'white', textDecoration:'none',
-              boxShadow:'0 8px 32px rgba(232,93,44,0.4)',
-            }}>
-              Create free account <FiArrowRight size={17} />
-            </Link>
+          <h2 style={{ fontFamily:SERIF, fontSize:'clamp(30px,5vw,54px)', fontWeight:800, color:'white', lineHeight:1.1, marginBottom:16 }}>
+            Your next favourite meal<br/>is one search away
+          </h2>
+          <p style={{ color:'rgba(255,255,255,0.72)', fontSize:17, lineHeight:1.7, marginBottom:14 }}>
+            300+ recipes · 25+ cuisines · AI Chef · Nearby places
+          </p>
+          <p style={{ color:'rgba(255,255,255,0.5)', fontSize:14, marginBottom:36 }}>
+            Completely free. No credit card. No ads. Forever.
+          </p>
+          <div style={{ display:'flex', gap:14, justifyContent:'center', flexWrap:'wrap' }}>
+            <motion.div whileHover={{ scale:1.04 }} whileTap={{ scale:0.97 }}>
+              <Link to="/signup" style={{
+                display:'inline-flex', alignItems:'center', gap:8,
+                fontWeight:700, fontSize:16, padding:'15px 36px', borderRadius:18,
+                background:'white', color:'#D85A30', textDecoration:'none',
+                boxShadow:'0 8px 32px rgba(0,0,0,0.2)',
+              }}>
+                Create free account <FiArrowRight size={17}/>
+              </Link>
+            </motion.div>
             <Link to="/login" style={{
               display:'inline-flex', alignItems:'center', gap:8,
-              fontWeight:700, fontSize:16, padding:'14px 28px', borderRadius:16,
-              background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.8)',
-              textDecoration:'none', border:'1px solid rgba(255,255,255,0.12)',
+              fontWeight:700, fontSize:16, padding:'15px 28px', borderRadius:18,
+              border:'2px solid rgba(255,255,255,0.5)', color:'white',
+              textDecoration:'none',
             }}>
               Sign in
             </Link>
           </div>
-        </Reveal>
+          {/* Social proof */}
+          <p style={{ color:'rgba(255,255,255,0.45)', fontSize:13, marginTop:28 }}>
+            ⭐⭐⭐⭐⭐ &nbsp;Built with React + Firebase + Spoonacular
+          </p>
+        </motion.div>
       </section>
 
       {/* ── FOOTER ───────────────────────────────────────────── */}

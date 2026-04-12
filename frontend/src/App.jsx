@@ -1,20 +1,21 @@
-// Dishcovery v5 - 2026-04-12 11:47
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { onAuthStateChanged } from 'firebase/auth'
 import { Toaster } from 'react-hot-toast'
 import { auth } from './firebase'
 
-import Navbar      from './components/Navbar'
-import Landing     from './pages/Landing'
-import Login       from './pages/Login'
-import Signup      from './pages/Signup'
-import Home        from './pages/Home'
-import MealDetails from './pages/MealDetails'
-import Favorites   from './pages/Favorites'
-import Profile     from './pages/Profile'
-import Nearby      from './pages/Nearby'
-import Chatbot     from './pages/Chatbot'
+import ErrorBoundary from './components/ErrorBoundary'
+import Navbar        from './components/Navbar'
+import Landing       from './pages/Landing'
+import Login         from './pages/Login'
+import Signup        from './pages/Signup'
+import Home          from './pages/Home'
+import MealDetails   from './pages/MealDetails'
+import Favorites     from './pages/Favorites'
+import Profile       from './pages/Profile'
+import Nearby        from './pages/Nearby'
+import Chatbot       from './pages/Chatbot'
+import NotFound      from './pages/NotFound'
 
 function PrivateRoute({ user, loading, children }) {
   if (loading) return (
@@ -27,14 +28,11 @@ function PrivateRoute({ user, loading, children }) {
 }
 
 export default function App() {
-  const [user, setUser]       = useState(null)
+  const [user, setUser]     = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u)
-      setLoading(false)
-    })
+    const unsub = onAuthStateChanged(auth, u => { setUser(u); setLoading(false) })
     return unsub
   }, [])
 
@@ -47,20 +45,22 @@ export default function App() {
 
       {user && <Navbar user={user} />}
 
-      <Routes>
-        <Route path="/"       element={user ? <Navigate to="/home" replace /> : <Landing />} />
-        <Route path="/login"  element={user ? <Navigate to="/home" replace /> : <Login />} />
-        <Route path="/signup" element={user ? <Navigate to="/home" replace /> : <Signup />} />
+      <ErrorBoundary>
+        <Routes>
+          <Route path="/"       element={user ? <Navigate to="/home" replace /> : <Landing />} />
+          <Route path="/login"  element={user ? <Navigate to="/home" replace /> : <Login />} />
+          <Route path="/signup" element={user ? <Navigate to="/home" replace /> : <Signup />} />
 
-        <Route path="/home"      element={<PrivateRoute user={user} loading={loading}><Home user={user} /></PrivateRoute>} />
-        <Route path="/meal/:id"  element={<PrivateRoute user={user} loading={loading}><MealDetails user={user} /></PrivateRoute>} />
-        <Route path="/favorites" element={<PrivateRoute user={user} loading={loading}><Favorites user={user} /></PrivateRoute>} />
-        <Route path="/profile"   element={<PrivateRoute user={user} loading={loading}><Profile user={user} /></PrivateRoute>} />
-        <Route path="/nearby"    element={<PrivateRoute user={user} loading={loading}><Nearby user={user} /></PrivateRoute>} />
-        <Route path="/chatbot"   element={<PrivateRoute user={user} loading={loading}><Chatbot user={user} /></PrivateRoute>} />
+          <Route path="/home"      element={<PrivateRoute user={user} loading={loading}><Home user={user} /></PrivateRoute>} />
+          <Route path="/meal/:id"  element={<PrivateRoute user={user} loading={loading}><MealDetails user={user} /></PrivateRoute>} />
+          <Route path="/favorites" element={<PrivateRoute user={user} loading={loading}><Favorites user={user} /></PrivateRoute>} />
+          <Route path="/profile"   element={<PrivateRoute user={user} loading={loading}><Profile user={user} /></PrivateRoute>} />
+          <Route path="/nearby"    element={<PrivateRoute user={user} loading={loading}><Nearby user={user} /></PrivateRoute>} />
+          <Route path="/chatbot"   element={<PrivateRoute user={user} loading={loading}><Chatbot user={user} /></PrivateRoute>} />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </ErrorBoundary>
     </BrowserRouter>
   )
 }
