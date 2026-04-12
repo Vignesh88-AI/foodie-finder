@@ -16,9 +16,20 @@ const BG = ['#fef3c7','#dbeafe','#fce7f3','#d1fae5','#ede9fe','#ffedd5','#f0fdf4
 
 async function fetchNearbyPlaces(lat, lng, radiusM, amenity) {
   const q = `[out:json][timeout:25];(node["amenity"="${amenity}"](around:${radiusM},${lat},${lng});way["amenity"="${amenity}"](around:${radiusM},${lat},${lng}););out center 30;`
-  const res = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:'data='+encodeURIComponent(q) })
-  const data = await res.json()
-  return data.elements || []
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15000) // 15s timeout
+  try {
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method:'POST', body:'data='+encodeURIComponent(q), signal:controller.signal
+    })
+    clearTimeout(timeout)
+    const data = await res.json()
+    return data.elements || []
+  } catch(err) {
+    clearTimeout(timeout)
+    if (err.name === 'AbortError') throw new Error('Search timed out. Overpass API is busy — try again in a moment.')
+    throw err
+  }
 }
 
 function getDistance(lat1,lon1,lat2,lon2) {

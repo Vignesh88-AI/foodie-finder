@@ -182,13 +182,18 @@ app.post('/api/chat', async (req, res) => {
   const GROQ_KEY = process.env.GROQ_API_KEY || ''
   if (!GROQ_KEY) return res.status(503).json({ error: 'Groq not configured. Add GROQ_API_KEY to Render env vars.' })
   try {
-    const { messages } = req.body
+    const { messages, systemPrompt } = req.body
+    // Build full message array with system prompt prepended
+    const fullMessages = [
+      { role: 'system', content: systemPrompt || 'You are Chef Dish, a helpful cooking assistant.' },
+      ...messages
+    ]
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
       body: JSON.stringify({
         model: 'llama3-8b-8192',
-        messages,
+        messages: fullMessages,
         max_tokens: 1024,
         temperature: 0.7,
       }),

@@ -100,13 +100,7 @@ export default function Chatbot({ user }) {
       .then(snap => setUserFavs(snap.docs.map(d => d.data().strMeal)))
   }, [user])
 
-  // Check if Groq is available
-  useEffect(() => {
-    fetch(`${API}/api/health`).then(r=>r.json()).then(d=>{
-      // We'll know after first message, but set optimistic
-      setGroqAvailable(true)
-    }).catch(()=>setGroqAvailable(false))
-  }, [])
+  // groqAvailable is set after first successful API call — don't pre-assume
 
   // Load saved chat history (#31)
   useEffect(() => {
@@ -171,18 +165,16 @@ export default function Chatbot({ user }) {
     setMessages(newMessages)
     setLoading(true)
 
-    // Build messages array for API (exclude welcome msg content, keep role/content)
-    const apiMessages = [
-      { role:'system', content: buildSystemPrompt(userFavs, userName) },
-      ...newMessages.map(m => ({ role:m.role, content:m.content }))
-    ]
+    // Build conversation for API — system prompt sent separately
+    const conversationMessages = newMessages.map(m => ({ role:m.role, content:m.content }))
+    const systemPrompt = buildSystemPrompt(userFavs, userName)
 
     try {
       // Call backend which holds the Groq key securely (#1 fix)
       const res = await fetch(`${API}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify({ messages: apiMessages.slice(1) }) // skip system in array, backend adds it
+        body: JSON.stringify({ messages: conversationMessages, systemPrompt }) // send both
       })
       if (!res.ok) throw new Error(await res.text())
       const data = await res.json()

@@ -1,3 +1,4 @@
+// Dishcovery v5 — All 32 issues resolved
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { onAuthStateChanged } from 'firebase/auth'

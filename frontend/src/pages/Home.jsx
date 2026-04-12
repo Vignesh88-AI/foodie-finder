@@ -350,7 +350,11 @@ export default function Home({ user }) {
         else if(mode==='cuisine'){const c=CUISINES.find(x=>x.value===cuisine);res=await edamamCuisine(c?.edamam||'',nextOffset)}
         else res=await edamamSearch('popular',nextOffset)
         setMeals(prev=>[...prev,...res.meals]); setHasMore(res.hasMore); setNextOffset(res.nextOffset)
-      } else { setHasMore(false) }
+      } else if (apiSource === 'mealdb') {
+        setHasMore(false) // MealDB filter results can't paginate
+      } else {
+        setHasMore(false)
+      }
     } catch { toast.error('Could not load more.') }
     finally { setLoadingMore(false) }
   }
@@ -369,7 +373,27 @@ export default function Home({ user }) {
     }
   }
 
-  const runSearch = (q) => { setSearch(q); setShowHistory(false); setTimeout(()=>handleSearch({preventDefault:()=>{}}),50) }
+  const runSearch = (q) => {
+    setSearch(q)
+    setShowHistory(false)
+    // Directly trigger search logic without fake event
+    setTimeout(() => {
+      if (!q.trim()) return
+      setLoading(true); setMode('search'); setActiveQuery(q); setCuisine(null); setDiet(null)
+      setAiSuggestion('')
+      saveSearchHistory(q); setSearchHistory(getSearchHistory())
+      Promise.resolve()
+        .then(async () => {
+          try { const res=await spoonSearch(q,0); if(res.meals.length>0){setMeals(res.meals);setHasMore(res.hasMore);setNextOffset(res.nextOffset);setTotalCount(res.total);setApiSource('spoon');return} } catch {}
+          try { const res=await edamamSearch(q,0); if(res.meals.length>0){setMeals(res.meals);setHasMore(res.hasMore);setNextOffset(res.nextOffset);setTotalCount(res.total);setApiSource('edamam');return} } catch {}
+          try {
+            const r=await fetch(`${MEALDB}/search.php?s=${encodeURIComponent(q)}`).then(r=>r.json())
+            const found=r.meals||[]; setMeals(found); setHasMore(false); setTotalCount(found.length); setApiSource('mealdb')
+          } catch {}
+        })
+        .finally(() => setLoading(false))
+    }, 10)
+  }
   const clearAll = () => { setSearch(''); loadPopular() }
   const cuisineLabel = CUISINES.find(c=>c.value===cuisine)?.label||''
   const dietLabel = DIETS.find(d=>d.value===diet)?.label||''

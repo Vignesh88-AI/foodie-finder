@@ -80,15 +80,15 @@ export default function Favorites({ user }) {
           </p>
         </div>
 
-        {/* Skeleton loading */}
+        {/* Skeleton loading — shown FIRST while loading */}
         {loading && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {Array.from({length:8}).map((_,i) => <SkeletonCard key={i} />)}
           </div>
         )}
 
-        {/* Empty state */}
-        {favorites.length === 0 && (
+        {/* Empty state — only shown when NOT loading */}
+        {!loading && favorites.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -106,7 +106,7 @@ export default function Favorites({ user }) {
         )}
 
         {/* Grid */}
-        {favorites.length > 0 && (
+        {!loading && favorites.length > 0 && (
           <AnimatePresence>
             <motion.div
               className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"
