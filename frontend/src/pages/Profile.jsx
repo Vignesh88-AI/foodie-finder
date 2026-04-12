@@ -6,25 +6,28 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import FoodAvatar, { getAllAvatarSVGs, getAvatarIndex } from '../components/FoodAvatar'
 import toast from 'react-hot-toast'
-import { FiEdit2, FiSave, FiX, FiHeart, FiLock, FiUser, FiMail, FiChevronRight, FiArrowLeft } from 'react-icons/fi'
+import {
+  FiEdit2, FiSave, FiX, FiHeart, FiLock,
+  FiUser, FiMail, FiChevronRight, FiArrowLeft, FiCheck
+} from 'react-icons/fi'
 
-const AVATAR_NAMES = ['Ramen', 'Pizza', 'Sushi', 'Burger', 'Biryani', 'Taco', 'Donut', 'Avocado', 'Ice Cream', 'Pineapple']
+const AVATAR_NAMES = ['Ramen','Pizza','Sushi','Burger','Biryani','Taco','Donut','Avocado','Ice Cream','Pineapple']
 
 export default function Profile({ user }) {
-  const navigate    = useNavigate()
-  const [favCount, setFavCount]         = useState(0)
-  const [displayName, setDisplayName]   = useState(user?.displayName || '')
-  const [editingName, setEditingName]   = useState(false)
-  const [savingName, setSavingName]     = useState(false)
+  const navigate  = useNavigate()
+  const [favCount, setFavCount]           = useState(0)
+  const [displayName, setDisplayName]     = useState(user?.displayName || '')
+  const [editingName, setEditingName]     = useState(false)
+  const [savingName, setSavingName]       = useState(false)
   const [showAvatarPicker, setShowAvatar] = useState(false)
   const [selectedAvatar, setSelectedAvatar] = useState(getAvatarIndex(user))
-  const [activeTab, setActiveTab]       = useState('profile') // 'profile' | 'security'
-  const [currentPass, setCurrentPass]   = useState('')
-  const [newPass, setNewPass]           = useState('')
-  const [confirmPass, setConfirmPass]   = useState('')
-  const [savingPass, setSavingPass]     = useState(false)
+  const [activeTab, setActiveTab]         = useState('profile')
+  const [currentPass, setCurrentPass]     = useState('')
+  const [newPass, setNewPass]             = useState('')
+  const [confirmPass, setConfirmPass]     = useState('')
+  const [savingPass, setSavingPass]       = useState(false)
 
-  const allAvatars = getAllAvatarSVGs(72)
+  const allAvatars = getAllAvatarSVGs(64)
 
   useEffect(() => {
     if (!user) return
@@ -40,11 +43,8 @@ export default function Profile({ user }) {
       await updateProfile(auth.currentUser, { displayName: displayName.trim() })
       toast.success('Name updated!')
       setEditingName(false)
-    } catch {
-      toast.error('Could not update name.')
-    } finally {
-      setSavingName(false)
-    }
+    } catch { toast.error('Could not update name.') }
+    finally { setSavingName(false) }
   }
 
   const savePassword = async () => {
@@ -60,9 +60,7 @@ export default function Profile({ user }) {
     } catch (err) {
       if (err.code === 'auth/wrong-password') toast.error('Current password is wrong.')
       else toast.error('Could not update password.')
-    } finally {
-      setSavingPass(false)
-    }
+    } finally { setSavingPass(false) }
   }
 
   const memberSince = user?.metadata?.creationTime
@@ -71,95 +69,91 @@ export default function Profile({ user }) {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-16">
-      <div className="max-w-2xl mx-auto px-4 pt-8">
+      <div className="max-w-xl mx-auto px-4 pt-6">
 
-        {/* Back */}
         <button onClick={() => navigate('/home')}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6 transition-colors">
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-5 transition-colors">
           <FiArrowLeft size={16} /> Back to home
         </button>
 
         {/* Profile card */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 mb-6">
+          className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 mb-5">
 
-          {/* Cover gradient */}
-          <div style={{ height: 100, background: 'linear-gradient(135deg, #D85A30, #FF8A50)' }} />
+          {/* Orange cover */}
+          <div style={{ height: 90, background: 'linear-gradient(135deg, #D85A30, #FF8A50)' }} />
 
-          {/* Avatar + info */}
+          {/* Avatar — overlapping cover at bottom */}
           <div className="px-6 pb-6">
-            <div className="flex items-end justify-between -mt-12 mb-4">
+            <div className="flex items-end justify-between" style={{ marginTop: -44 }}>
+              {/* Avatar */}
               <div className="relative">
-                <div className="rounded-3xl overflow-hidden border-4 border-white shadow-lg"
-                  style={{ width: 88, height: 88 }}>
-                  <FoodAvatar user={user} size={88} selectedIndex={selectedAvatar} />
+                <div className="rounded-2xl overflow-hidden border-4 border-white shadow-lg bg-white"
+                  style={{ width: 80, height: 80 }}>
+                  <FoodAvatar user={user} size={80} selectedIndex={selectedAvatar} />
                 </div>
                 <button onClick={() => setShowAvatar(true)}
-                  className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brand-500 text-white flex items-center justify-center shadow-md hover:bg-brand-600 transition-colors"
-                  title="Change avatar">
-                  <FiEdit2 size={12} />
+                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full text-white flex items-center justify-center shadow-md"
+                  style={{ background: '#D85A30' }}>
+                  <FiEdit2 size={11} />
                 </button>
               </div>
 
-              {/* Stats */}
-              <div className="flex gap-6 text-center pb-2">
-                <div>
+              {/* Stats — floated right, at same level as bottom of cover */}
+              <div className="flex gap-5 pb-1" style={{ marginTop: 44 }}>
+                <div className="text-center">
                   <div className="text-xl font-bold text-gray-900">{favCount}</div>
                   <div className="text-xs text-gray-400">Saved</div>
                 </div>
-                <div>
-                  <div className="text-xl font-bold text-gray-900">🌍</div>
+                <div className="text-center">
+                  <div className="text-xl">🌍</div>
                   <div className="text-xs text-gray-400">Explorer</div>
                 </div>
               </div>
             </div>
 
             {/* Name */}
-            <div className="mb-1">
+            <div className="mt-3">
               {editingName ? (
                 <div className="flex items-center gap-2">
-                  <input
-                    value={displayName}
-                    onChange={e => setDisplayName(e.target.value)}
-                    className="input flex-1 text-lg font-bold py-1.5"
-                    onKeyDown={e => e.key === 'Enter' && saveName()}
-                    autoFocus
-                  />
+                  <input value={displayName} onChange={e => setDisplayName(e.target.value)}
+                    className="input flex-1 text-base font-bold py-1.5"
+                    onKeyDown={e => e.key === 'Enter' && saveName()} autoFocus />
                   <button onClick={saveName} disabled={savingName}
-                    className="p-2 rounded-xl bg-brand-500 text-white hover:bg-brand-600 transition-colors">
-                    <FiSave size={16} />
+                    className="p-2 rounded-xl text-white" style={{ background: '#D85A30' }}>
+                    <FiSave size={15} />
                   </button>
                   <button onClick={() => { setEditingName(false); setDisplayName(user?.displayName || '') }}
-                    className="p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
-                    <FiX size={16} />
+                    className="p-2 rounded-xl bg-gray-100 text-gray-600">
+                    <FiX size={15} />
                   </button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold text-gray-900">{user?.displayName || 'Foodie'}</h1>
+                  <h1 className="text-lg font-bold text-gray-900">{user?.displayName || 'Foodie'}</h1>
                   <button onClick={() => setEditingName(true)}
                     className="p-1.5 rounded-lg text-gray-400 hover:text-brand-500 hover:bg-brand-50 transition-colors">
-                    <FiEdit2 size={14} />
+                    <FiEdit2 size={13} />
                   </button>
                 </div>
               )}
+              <p className="text-sm text-gray-400">{user?.email}</p>
+              <p className="text-xs text-gray-300 mt-0.5">Member since {memberSince}</p>
             </div>
-            <p className="text-sm text-gray-400 mb-1">{user?.email}</p>
-            <p className="text-xs text-gray-300">Member since {memberSince}</p>
           </div>
         </motion.div>
 
-        {/* Avatar picker modal */}
+        {/* Avatar picker */}
         <AnimatePresence>
           {showAvatarPicker && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)' }}>
               <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }} transition={{ duration: 0.25, ease: [0.22,1,0.36,1] }}
+                exit={{ scale: 0.9, opacity: 0 }} transition={{ duration: 0.22 }}
                 className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
                 <div className="flex items-center justify-between mb-5">
-                  <h3 className="font-bold text-gray-900 text-lg">Choose your food avatar</h3>
+                  <h3 className="font-bold text-gray-900 text-lg">Choose avatar</h3>
                   <button onClick={() => setShowAvatar(false)}
                     className="p-1.5 rounded-xl text-gray-400 hover:bg-gray-100">
                     <FiX size={18} />
@@ -167,56 +161,51 @@ export default function Profile({ user }) {
                 </div>
                 <div className="grid grid-cols-5 gap-3 mb-5">
                   {allAvatars.map((svg, i) => (
-                    <motion.button key={i} whileTap={{ scale: 0.9 }}
+                    <motion.button key={i} whileTap={{ scale: 0.88 }}
                       onClick={() => setSelectedAvatar(i)}
-                      className="flex flex-col items-center gap-1.5"
-                    >
-                      <div className={`rounded-2xl overflow-hidden border-2 transition-all ${selectedAvatar === i ? 'border-brand-500 shadow-lg scale-110' : 'border-transparent hover:border-gray-200'}`}
-                        style={{ width: 52, height: 52 }}
+                      className="flex flex-col items-center gap-1">
+                      <div className={`rounded-xl overflow-hidden border-2 transition-all ${selectedAvatar === i ? 'scale-110 shadow-lg' : 'border-transparent hover:border-gray-200'}`}
+                        style={{ width: 48, height: 48, borderColor: selectedAvatar === i ? '#D85A30' : undefined }}
                         dangerouslySetInnerHTML={{ __html: svg }} />
-                      <span className="text-xs text-gray-400" style={{ fontSize: 9 }}>{AVATAR_NAMES[i]}</span>
+                      <span className="text-gray-400" style={{ fontSize: 9 }}>{AVATAR_NAMES[i]}</span>
                     </motion.button>
                   ))}
                 </div>
-                <button onClick={() => {
-                  toast.success(`${AVATAR_NAMES[selectedAvatar]} avatar selected!`)
-                  setShowAvatar(false)
-                }} className="btn-primary w-full">
-                  Save avatar
-                </button>
+                <button onClick={() => { toast.success(`${AVATAR_NAMES[selectedAvatar]} selected!`); setShowAvatar(false) }}
+                  className="btn-primary w-full">Save avatar</button>
               </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-6">
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-5">
           {[['profile', FiUser, 'Profile'], ['security', FiLock, 'Security']].map(([t, Icon, label]) => (
             <button key={t} onClick={() => setActiveTab(t)}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}>
-              <Icon size={15} /> {label}
+              <Icon size={14} /> {label}
             </button>
           ))}
         </div>
 
-        {/* Profile tab */}
         <AnimatePresence mode="wait">
           {activeTab === 'profile' && (
             <motion.div key="profile" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
               <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm mb-4">
-                <div className="px-5 py-4 border-b border-gray-50">
-                  <h3 className="font-semibold text-gray-800">Account info</h3>
+                <div className="px-5 py-3.5 border-b border-gray-50">
+                  <h3 className="font-semibold text-gray-800 text-sm">Account info</h3>
                 </div>
                 {[
                   { icon: FiUser,  label: 'Display name', value: user?.displayName || 'Not set' },
                   { icon: FiMail,  label: 'Email',        value: user?.email },
-                  { icon: FiHeart, label: 'Saved meals',  value: `${favCount} meals` },
+                  { icon: FiHeart, label: 'Saved meals',  value: `${favCount} meal${favCount !== 1 ? 's' : ''}` },
                 ].map(({ icon: Icon, label, value }) => (
-                  <div key={label} className="flex items-center gap-4 px-5 py-4 border-b border-gray-50 last:border-0">
-                    <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-500 flex items-center justify-center">
-                      <Icon size={16} />
+                  <div key={label} className="flex items-center gap-4 px-5 py-3.5 border-b border-gray-50 last:border-0">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: '#FFF3EE', color: '#D85A30' }}>
+                      <Icon size={15} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-gray-400 mb-0.5">{label}</p>
@@ -226,38 +215,36 @@ export default function Profile({ user }) {
                 ))}
               </div>
 
-              {/* Quick links */}
               <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-                <div className="px-5 py-4 border-b border-gray-50">
-                  <h3 className="font-semibold text-gray-800">Quick links</h3>
+                <div className="px-5 py-3.5 border-b border-gray-50">
+                  <h3 className="font-semibold text-gray-800 text-sm">Quick links</h3>
                 </div>
                 {[
-                  { label: 'My saved meals', icon: FiHeart, action: () => navigate('/favorites'), color: 'text-brand-500', bg: 'bg-brand-50' },
-                  { label: 'Browse all cuisines', icon: FiUser, action: () => navigate('/home'), color: 'text-blue-500', bg: 'bg-blue-50' },
+                  { label: 'My saved meals',   icon: FiHeart, action: () => navigate('/favorites'), color: '#D85A30', bg: '#FFF3EE' },
+                  { label: 'Browse recipes',   icon: FiUser,  action: () => navigate('/home'),      color: '#2563eb', bg: '#eff6ff' },
                 ].map(({ label, icon: Icon, action, color, bg }) => (
                   <button key={label} onClick={action}
-                    className="w-full flex items-center gap-4 px-5 py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors text-left">
-                    <div className={`w-9 h-9 rounded-xl ${bg} ${color} flex items-center justify-center`}>
-                      <Icon size={16} />
+                    className="w-full flex items-center gap-4 px-5 py-3.5 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors text-left">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: bg, color }}>
+                      <Icon size={15} />
                     </div>
                     <span className="flex-1 text-sm font-medium text-gray-800">{label}</span>
-                    <FiChevronRight size={16} className="text-gray-300" />
+                    <FiChevronRight size={15} className="text-gray-300" />
                   </button>
                 ))}
               </div>
             </motion.div>
           )}
 
-          {/* Security tab */}
           {activeTab === 'security' && (
             <motion.div key="security" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                <h3 className="font-semibold text-gray-800 mb-4">Change password</h3>
+                <h3 className="font-semibold text-gray-800 mb-4 text-sm">Change password</h3>
                 <div className="space-y-3">
                   {[
-                    { label: 'Current password', val: currentPass, set: setCurrentPass, ph: '••••••••' },
-                    { label: 'New password',      val: newPass,     set: setNewPass,     ph: 'Min. 6 characters' },
-                    { label: 'Confirm new password', val: confirmPass, set: setConfirmPass, ph: 'Repeat new password' },
+                    { label: 'Current password',    val: currentPass, set: setCurrentPass, ph: '••••••••' },
+                    { label: 'New password',         val: newPass,     set: setNewPass,     ph: 'Min. 6 characters' },
+                    { label: 'Confirm new password', val: confirmPass, set: setConfirmPass, ph: 'Repeat password' },
                   ].map(({ label, val, set, ph }) => (
                     <div key={label}>
                       <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}</label>
@@ -265,8 +252,7 @@ export default function Profile({ user }) {
                         placeholder={ph} className="input" />
                     </div>
                   ))}
-                  <button onClick={savePassword} disabled={savingPass}
-                    className="btn-primary w-full mt-2">
+                  <button onClick={savePassword} disabled={savingPass} className="btn-primary w-full mt-1">
                     {savingPass ? 'Updating…' : 'Update password'}
                   </button>
                 </div>
@@ -274,7 +260,6 @@ export default function Profile({ user }) {
             </motion.div>
           )}
         </AnimatePresence>
-
       </div>
     </div>
   )

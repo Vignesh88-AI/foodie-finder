@@ -4,7 +4,7 @@ import { signOut } from 'firebase/auth'
 import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { auth, db } from '../firebase'
-import { FiHome, FiHeart, FiLogOut, FiMenu, FiX, FiChevronDown, FiUser, FiSettings } from 'react-icons/fi'
+import { FiHome, FiHeart, FiLogOut, FiMenu, FiX, FiChevronDown, FiUser, FiMapPin, FiMessageCircle } from 'react-icons/fi'
 import FoodAvatar from './FoodAvatar'
 import toast from 'react-hot-toast'
 
@@ -33,8 +33,7 @@ export default function Navbar({ user }) {
     await signOut(auth)
     toast.success('Signed out')
     navigate('/login')
-    setMobile(false)
-    setProfile(false)
+    setMobile(false); setProfile(false)
   }
 
   const isActive = (path) => location.pathname === path
@@ -68,8 +67,6 @@ export default function Navbar({ user }) {
         className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm"
       >
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-
-          {/* Logo */}
           <Link to="/home" className="flex items-center gap-2">
             <motion.span whileHover={{ rotate: [-5, 5, -3, 0] }} transition={{ duration: 0.4 }}>
               <span className="text-2xl">🍽</span>
@@ -79,12 +76,12 @@ export default function Navbar({ user }) {
             </span>
           </Link>
 
-          {/* Desktop nav */}
-          <div className="hidden sm:flex items-center gap-1.5">
-            <NavBtn to="/home"      icon={FiHome}  label="Home" />
-            <NavBtn to="/favorites" icon={FiHeart} label="Favorites" badge={favCount} />
+          <div className="hidden sm:flex items-center gap-1">
+            <NavBtn to="/home"      icon={FiHome}        label="Home" />
+            <NavBtn to="/favorites" icon={FiHeart}       label="Favourites" badge={favCount} />
+            <NavBtn to="/nearby"    icon={FiMapPin}      label="Nearby" />
+            <NavBtn to="/chatbot"   icon={FiMessageCircle} label="AI Chef" />
 
-            {/* Profile dropdown */}
             <div ref={profileRef} className="relative ml-1">
               <motion.button whileTap={{ scale: 0.95 }}
                 onClick={() => setProfile(!profileOpen)}
@@ -100,10 +97,9 @@ export default function Navbar({ user }) {
                     initial={{ opacity: 0, y: 8, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                    transition={{ duration: 0.18, ease: [0.22,1,0.36,1] }}
+                    transition={{ duration: 0.18 }}
                     className="absolute right-0 top-full mt-2 w-60 bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden z-50"
                   >
-                    {/* Profile header */}
                     <div className="px-4 py-4 border-b border-gray-50">
                       <div className="flex items-center gap-3">
                         <FoodAvatar user={user} size={44} />
@@ -113,37 +109,28 @@ export default function Navbar({ user }) {
                         </div>
                       </div>
                     </div>
-
-                    {/* Stats */}
-                    <div className="px-4 py-3 flex items-center gap-3 border-b border-gray-50">
-                      <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                        <FiHeart size={13} style={{ color: '#D85A30' }} />
-                        <span className="font-medium">{favCount}</span>
-                        <span className="text-gray-400">saved</span>
-                      </div>
+                    <div className="px-4 py-2.5 flex items-center gap-2 text-sm text-gray-600 border-b border-gray-50">
+                      <FiHeart size={13} style={{ color: '#D85A30' }} />
+                      <span className="font-medium">{favCount}</span>
+                      <span className="text-gray-400">saved meals</span>
                     </div>
-
-                    {/* Menu items */}
-                    <Link to="/profile" onClick={() => setProfile(false)}
-                      className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                      <div className="w-7 h-7 rounded-lg bg-brand-50 text-brand-500 flex items-center justify-center">
-                        <FiUser size={13} />
-                      </div>
-                      View profile & settings
-                    </Link>
-
-                    <Link to="/favorites" onClick={() => setProfile(false)}
-                      className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                      <div className="w-7 h-7 rounded-lg bg-pink-50 text-pink-500 flex items-center justify-center">
-                        <FiHeart size={13} />
-                      </div>
-                      My saved meals
-                    </Link>
-
-                    <div style={{ borderTop: '1px solid #f9fafb' }} />
-
+                    {[
+                      { to: '/profile',   icon: FiUser,        label: 'Profile & settings',  bg: 'bg-brand-50',  color: 'text-brand-500' },
+                      { to: '/favorites', icon: FiHeart,        label: 'My saved meals',       bg: 'bg-pink-50',   color: 'text-pink-500' },
+                      { to: '/nearby',    icon: FiMapPin,       label: 'Find nearby places',   bg: 'bg-blue-50',   color: 'text-blue-500' },
+                      { to: '/chatbot',   icon: FiMessageCircle,label: 'AI Chef assistant',    bg: 'bg-green-50',  color: 'text-green-600' },
+                    ].map(({ to, icon: Icon, label, bg, color }) => (
+                      <Link key={to} to={to} onClick={() => setProfile(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                        <div className={`w-7 h-7 rounded-lg ${bg} ${color} flex items-center justify-center`}>
+                          <Icon size={13} />
+                        </div>
+                        {label}
+                      </Link>
+                    ))}
+                    <div className="border-t border-gray-50" />
                     <button onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
                       <div className="w-7 h-7 rounded-lg bg-red-50 text-red-500 flex items-center justify-center">
                         <FiLogOut size={13} />
                       </div>
@@ -155,15 +142,12 @@ export default function Navbar({ user }) {
             </div>
           </div>
 
-          {/* Mobile hamburger */}
-          <button className="sm:hidden p-2 rounded-xl text-gray-600 hover:bg-gray-100"
-            onClick={() => setMobile(!mobileOpen)}>
+          <button className="sm:hidden p-2 rounded-xl text-gray-600 hover:bg-gray-100" onClick={() => setMobile(!mobileOpen)}>
             {mobileOpen ? <FiX size={20} /> : <FiMenu size={20} />}
           </button>
         </div>
       </motion.nav>
 
-      {/* Mobile menu */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
@@ -178,14 +162,14 @@ export default function Navbar({ user }) {
                 </div>
               </div>
               {[
-                { to: '/home',      icon: FiHome,  label: 'Home' },
-                { to: '/favorites', icon: FiHeart, label: `Favorites${favCount > 0 ? ` (${favCount})` : ''}` },
-                { to: '/profile',   icon: FiUser,  label: 'Profile & Settings' },
+                { to: '/home',      icon: FiHome,         label: 'Home' },
+                { to: '/favorites', icon: FiHeart,        label: `Favourites${favCount > 0 ? ` (${favCount})` : ''}` },
+                { to: '/nearby',    icon: FiMapPin,       label: 'Nearby Places' },
+                { to: '/chatbot',   icon: FiMessageCircle,label: 'AI Chef' },
+                { to: '/profile',   icon: FiUser,         label: 'Profile & Settings' },
               ].map(({ to, icon: Icon, label }) => (
                 <Link key={to} to={to} onClick={() => setMobile(false)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                    isActive(to) ? 'text-white' : 'text-gray-600 hover:bg-gray-100'
-                  }`}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium ${isActive(to) ? 'text-white' : 'text-gray-600 hover:bg-gray-100'}`}
                   style={isActive(to) ? { background: '#D85A30' } : {}}>
                   <Icon size={15} /> {label}
                 </Link>
