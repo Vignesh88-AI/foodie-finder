@@ -1,153 +1,181 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FiMapPin, FiSearch, FiStar, FiClock, FiNavigation, FiFilter } from 'react-icons/fi'
+import { FiMapPin, FiSearch, FiStar, FiNavigation, FiClock, FiExternalLink } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 
 const PLACE_TYPES = [
-  { label: '🍽 Restaurants', value: 'restaurant' },
-  { label: '☕ Cafés',        value: 'cafe' },
-  { label: '🎂 Bakeries',    value: 'bakery' },
-  { label: '🍕 Fast Food',   value: 'meal_takeaway' },
-  { label: '🍦 Desserts',    value: 'dessert' },
+  { label: '🍽 Restaurants', tag: 'restaurant',  amenity: 'restaurant' },
+  { label: '☕ Cafés',        tag: 'cafe',         amenity: 'cafe' },
+  { label: '🎂 Bakeries',    tag: 'bakery',       amenity: 'bakery' },
+  { label: '🍕 Fast Food',   tag: 'fast_food',    amenity: 'fast_food' },
+  { label: '🍦 Ice Cream',   tag: 'ice_cream',    amenity: 'ice_cream' },
 ]
 
-// Since Google Maps API requires a key we can't hardcode,
-// we'll build the UI and use the key from env var
-const GMAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || ''
+// Uses OpenStreetMap Overpass API — completely free, no key needed
+async function fetchNearbyPlaces(lat, lng, radiusM, amenity) {
+  const query = `
+    [out:json][timeout:25];
+    (
+      node["amenity"="${amenity}"](around:${radiusM},${lat},${lng});
+      way["amenity"="${amenity}"](around:${radiusM},${lat},${lng});
+    );
+    out center 30;
+  `
+  const res = await fetch('https://overpass-api.de/api/interpreter', {
+    method: 'POST',
+    body: 'data=' + encodeURIComponent(query),
+  })
+  const data = await res.json()
+  return data.elements || []
+}
 
-export default function Nearby({ user }) {
-  const [location, setLocation]     = useState(null)
-  const [places, setPlaces]         = useState([])
-  const [loading, setLoading]       = useState(false)
-  const [locLoading, setLocLoading] = useState(false)
-  const [placeType, setPlaceType]   = useState('restaurant')
-  const [radius, setRadius]         = useState(2000) // metres
-  const [locationName, setLocationName] = useState('')
-  const [permissionDenied, setPermDenied] = useState(false)
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)))
+}
+
+function formatDistance(m) {
+  return m >= 1000 ? `${(m/1000).toFixed(1)} km` : `${m} m`
+}
+
+// Food emoji based on amenity type
+const PLACE_EMOJI = {
+  restaurant: '🍽', cafe: '☕', bakery: '🎂', fast_food: '🍕', ice_cream: '🍦'
+}
+
+// Leaflet map (loaded dynamically)
+function LeafletMap({ location, places, activeType }) {
   const mapRef = useRef(null)
-  const mapInstance = useRef(null)
+  const mapInst = useRef(null)
   const markersRef = useRef([])
 
-  const getLocation = () => {
-    setLocLoading(true)
-    setPermDenied(false)
-    if (!navigator.geolocation) {
-      toast.error('Geolocation not supported by your browser')
-      setLocLoading(false)
-      return
+  useEffect(() => {
+    if (!mapRef.current || !location) return
+
+    // Load Leaflet CSS
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link')
+      link.id = 'leaflet-css'
+      link.rel = 'stylesheet'
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+      document.head.appendChild(link)
     }
+
+    // Load Leaflet JS
+    const initMap = () => {
+      if (mapInst.current) {
+        mapInst.current.remove()
+        mapInst.current = null
+      }
+      const L = window.L
+      const map = L.map(mapRef.current).setView([location.lat, location.lng], 15)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map)
+
+      // User marker
+      const userIcon = L.divIcon({
+        html: `<div style="width:16px;height:16px;background:#D85A30;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3)"></div>`,
+        iconSize: [16, 16], iconAnchor: [8, 8], className: ''
+      })
+      L.marker([location.lat, location.lng], { icon: userIcon }).addTo(map).bindPopup('📍 You are here')
+
+      // Place markers
+      markersRef.current = places.slice(0, 20).map((p, i) => {
+        const lat = p.lat || p.center?.lat
+        const lng = p.lon || p.center?.lon
+        if (!lat || !lng) return null
+        const icon = L.divIcon({
+          html: `<div style="width:28px;height:28px;background:#1a1a1a;color:white;border:2px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.25)">${i+1}</div>`,
+          iconSize: [28, 28], iconAnchor: [14, 14], className: ''
+        })
+        const name = p.tags?.name || 'Unnamed'
+        return L.marker([lat, lng], { icon }).addTo(map)
+          .bindPopup(`<strong>${name}</strong><br/>${PLACE_EMOJI[activeType] || '🍽'} ${activeType}`)
+      }).filter(Boolean)
+
+      mapInst.current = map
+    }
+
+    if (window.L) {
+      initMap()
+    } else {
+      const script = document.createElement('script')
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+      script.onload = initMap
+      document.head.appendChild(script)
+    }
+
+    return () => {
+      if (mapInst.current) { mapInst.current.remove(); mapInst.current = null }
+    }
+  }, [location, places])
+
+  return <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+}
+
+export default function Nearby() {
+  const [location, setLocation]   = useState(null)
+  const [places, setPlaces]       = useState([])
+  const [loading, setLoading]     = useState(false)
+  const [locLoading, setLocLoading] = useState(false)
+  const [placeType, setPlaceType] = useState(PLACE_TYPES[0])
+  const [radius, setRadius]       = useState(1500)
+  const [denied, setDenied]       = useState(false)
+  const [cityName, setCityName]   = useState('')
+
+  const getLocation = () => {
+    setLocLoading(true); setDenied(false)
+    if (!navigator.geolocation) { toast.error('Geolocation not supported'); setLocLoading(false); return }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-        setLocation(loc)
-        setLocLoading(false)
+        setLocation(loc); setLocLoading(false)
         toast.success('Location found!')
-        reverseGeocode(loc)
+        // Reverse geocode using Nominatim (free)
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${loc.lat}&lon=${loc.lng}&format=json`)
+          const data = await res.json()
+          setCityName(data.address?.city || data.address?.town || data.address?.suburb || '')
+        } catch {}
       },
       (err) => {
         setLocLoading(false)
-        if (err.code === 1) {
-          setPermDenied(true)
-          toast.error('Location access denied. Please allow location in your browser settings.')
-        } else {
-          toast.error('Could not get location. Please try again.')
-        }
+        if (err.code === 1) { setDenied(true); toast.error('Location access denied') }
+        else toast.error('Could not get location')
       },
       { timeout: 10000, enableHighAccuracy: true }
     )
   }
 
-  const reverseGeocode = async (loc) => {
-    if (!GMAPS_KEY) return
-    try {
-      const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${loc.lat},${loc.lng}&key=${GMAPS_KEY}`)
-      const data = await res.json()
-      if (data.results?.[0]) {
-        const city = data.results[0].address_components.find(c => c.types.includes('locality'))?.long_name || ''
-        setLocationName(city)
-      }
-    } catch {}
-  }
-
   const searchNearby = async () => {
     if (!location) { toast.error('Please allow location access first'); return }
-    if (!GMAPS_KEY) {
-      // Show demo data when no API key
-      showDemoPlaces()
-      return
-    }
-    setLoading(true)
-    setPlaces([])
+    setLoading(true); setPlaces([])
     try {
-      // Use Places API via backend proxy (avoids CORS)
-      const res = await fetch(
-        `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${location.lat},${location.lng}&radius=${radius}&type=${placeType}&key=${GMAPS_KEY}`
-      )
-      const data = await res.json()
-      if (data.results) {
-        setPlaces(data.results.slice(0, 20))
-        initMap(data.results.slice(0, 20))
-      } else {
-        toast.error('No places found nearby')
-      }
-    } catch {
-      showDemoPlaces()
-    } finally {
-      setLoading(false)
-    }
+      const results = await fetchNearbyPlaces(location.lat, location.lng, radius, placeType.amenity)
+      // Sort by distance
+      const sorted = results
+        .filter(p => p.tags?.name)
+        .map(p => ({
+          ...p,
+          _dist: getDistance(location.lat, location.lng, p.lat || p.center?.lat, p.lon || p.center?.lon)
+        }))
+        .sort((a, b) => a._dist - b._dist)
+        .slice(0, 20)
+      setPlaces(sorted)
+      if (sorted.length === 0) toast('No places found. Try increasing the radius.', { icon: '🔍' })
+      else toast.success(`Found ${sorted.length} places nearby!`)
+    } catch { toast.error('Search failed. Please try again.') }
+    finally { setLoading(false) }
   }
 
-  const showDemoPlaces = () => {
-    // Show UI demo when no API key configured
-    setPlaces([
-      { place_id: '1', name: 'Add your Google Maps API key', vicinity: 'See setup instructions below', rating: 0, opening_hours: { open_now: false }, _demo: true },
-    ])
-    setLoading(false)
-    toast('Add VITE_GOOGLE_MAPS_KEY to your .env to enable real results', { icon: 'ℹ️', duration: 6000 })
-  }
-
-  const initMap = (results) => {
-    if (!mapRef.current || !window.google) return
-    const map = new window.google.maps.Map(mapRef.current, {
-      center: location, zoom: 14,
-      styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }]
-    })
-    mapInstance.current = map
-
-    // Clear old markers
-    markersRef.current.forEach(m => m.setMap(null))
-    markersRef.current = []
-
-    // User location marker
-    new window.google.maps.Marker({
-      position: location, map,
-      icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: '#D85A30', fillOpacity: 1, strokeColor: 'white', strokeWeight: 2 },
-      title: 'You are here'
-    })
-
-    // Place markers
-    results.forEach((place, i) => {
-      if (!place.geometry) return
-      const marker = new window.google.maps.Marker({
-        position: place.geometry.location, map,
-        label: { text: String(i + 1), color: 'white', fontWeight: 'bold', fontSize: '12px' },
-        icon: { path: window.google.maps.SymbolPath.MAP_PIN, scale: 14, fillColor: '#1a1a1a', fillOpacity: 0.9, strokeColor: 'white', strokeWeight: 1 },
-        title: place.name,
-      })
-      markersRef.current.push(marker)
-    })
-  }
-
-  useEffect(() => {
-    if (location && places.length > 0 && window.google) initMap(places)
-  }, [places])
-
-  const openInMaps = (place) => {
-    if (place.geometry?.location) {
-      const lat = typeof place.geometry.location.lat === 'function' ? place.geometry.location.lat() : place.geometry.location.lat
-      const lng = typeof place.geometry.location.lng === 'function' ? place.geometry.location.lng() : place.geometry.location.lng
-      window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}&query_place_id=${place.place_id}`, '_blank')
-    }
+  const openDirections = (place) => {
+    const lat = place.lat || place.center?.lat
+    const lng = place.lon || place.center?.lon
+    window.open(`https://www.openstreetmap.org/directions?from=${location.lat},${location.lng}&to=${lat},${lng}`, '_blank')
   }
 
   return (
@@ -158,49 +186,42 @@ export default function Nearby({ user }) {
           className="max-w-2xl mx-auto text-center">
           <div className="text-4xl mb-3">📍</div>
           <h1 className="font-display text-3xl font-bold text-white mb-2">Nearby Food Places</h1>
-          <p className="text-blue-100 text-sm">Find restaurants, cafés and bakeries near you</p>
+          <p className="text-blue-100 text-sm">Find restaurants, cafés & bakeries near you — free, no signup</p>
         </motion.div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Location + Search controls */}
+        {/* Controls card */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
-
+          className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
           <div className="flex flex-wrap gap-4 items-end">
-            {/* Location button */}
+
+            {/* Location */}
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Your location</label>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Your location</p>
               <button onClick={getLocation} disabled={locLoading}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed transition-all text-sm font-medium"
+                className="w-full flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed text-sm font-medium transition-all"
                 style={{
                   borderColor: location ? '#D85A30' : '#e5e7eb',
                   background: location ? 'rgba(216,90,48,0.05)' : 'white',
                   color: location ? '#D85A30' : '#6b7280',
                 }}>
-                <FiMapPin size={16} />
+                <FiMapPin size={15} />
                 {locLoading ? 'Getting location…'
-                  : location ? `📍 ${locationName || `${location.lat.toFixed(3)}, ${location.lng.toFixed(3)}`}`
+                  : location ? `📍 ${cityName || `${location.lat.toFixed(3)}, ${location.lng.toFixed(3)}`}`
                   : 'Click to use my location'}
               </button>
-              {permissionDenied && (
-                <p className="text-xs text-red-500 mt-1.5">
-                  ⚠️ Location blocked. Go to browser settings → Site settings → Allow location for this site.
-                </p>
-              )}
+              {denied && <p className="text-xs text-red-500 mt-1.5">Allow location in browser settings → Site settings</p>}
             </div>
 
-            {/* Place type */}
-            <div className="flex-1 min-w-[180px]">
-              <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Place type</label>
+            {/* Place type pills */}
+            <div className="flex-1 min-w-[220px]">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Place type</p>
               <div className="flex flex-wrap gap-2">
                 {PLACE_TYPES.map(pt => (
-                  <button key={pt.value} onClick={() => setPlaceType(pt.value)}
+                  <button key={pt.tag} onClick={() => setPlaceType(pt)}
                     className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
-                    style={{
-                      background: placeType === pt.value ? '#D85A30' : '#f3f4f6',
-                      color: placeType === pt.value ? 'white' : '#6b7280',
-                    }}>
+                    style={{ background: placeType.tag === pt.tag ? '#D85A30' : '#f3f4f6', color: placeType.tag === pt.tag ? 'white' : '#6b7280' }}>
                     {pt.label}
                   </button>
                 ))}
@@ -209,63 +230,39 @@ export default function Nearby({ user }) {
 
             {/* Radius */}
             <div className="min-w-[160px]">
-              <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
-                Radius: {radius >= 1000 ? `${radius/1000}km` : `${radius}m`}
-              </label>
-              <input type="range" min={500} max={10000} step={500} value={radius}
-                onChange={e => setRadius(Number(e.target.value))}
-                className="w-full" />
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                Radius: {radius >= 1000 ? `${(radius/1000).toFixed(1)}km` : `${radius}m`}
+              </p>
+              <input type="range" min={500} max={8000} step={500} value={radius}
+                onChange={e => setRadius(Number(e.target.value))} className="w-full" />
             </div>
 
-            {/* Search button */}
             <button onClick={searchNearby} disabled={loading || !location}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm text-white transition-all disabled:opacity-50"
-              style={{ background: '#D85A30', boxShadow: '0 4px 14px rgba(216,90,48,0.3)' }}>
-              <FiSearch size={16} />
+              className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm text-white disabled:opacity-40 transition-all"
+              style={{ background: '#D85A30', boxShadow: '0 4px 14px rgba(216,90,48,0.28)' }}>
+              <FiSearch size={15} />
               {loading ? 'Searching…' : 'Find places'}
             </button>
           </div>
         </motion.div>
 
-        {/* No API key notice */}
-        {!GMAPS_KEY && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 text-sm text-amber-800">
-            <strong>🗺️ Setup required:</strong> Add <code className="bg-amber-100 px-1 rounded">VITE_GOOGLE_MAPS_KEY=your_key</code> to your{' '}
-            <code className="bg-amber-100 px-1 rounded">frontend/.env</code> and{' '}
-            <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com" target="_blank" rel="noreferrer" className="underline font-semibold">
-              enable Places API
-            </a>{' '}
-            in Google Cloud Console to see real nearby places.
-          </motion.div>
-        )}
-
         {/* Map */}
-        {location && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-6"
-            style={{ height: 340 }}>
-            <div ref={mapRef} style={{ width: '100%', height: '100%' }}>
-              {!GMAPS_KEY && (
-                <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                  <div className="text-center text-gray-500">
-                    <div className="text-4xl mb-2">🗺️</div>
-                    <p className="text-sm font-medium">Map will appear here</p>
-                    <p className="text-xs text-gray-400 mt-1">Add Google Maps API key to enable</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
+        <AnimatePresence>
+          {location && (
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-6"
+              style={{ height: 320 }}>
+              <LeafletMap location={location} places={places} activeType={placeType.amenity} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Loading */}
         {loading && (
-          <div className="flex justify-center py-16">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-10 h-10 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#D85A30', borderTopColor: 'transparent' }} />
-              <p className="text-sm text-gray-500">Searching nearby places…</p>
-            </div>
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <div className="w-10 h-10 border-2 border-t-transparent rounded-full animate-spin"
+              style={{ borderColor: '#D85A30', borderTopColor: 'transparent' }} />
+            <p className="text-sm text-gray-500">Searching nearby {placeType.label}…</p>
           </div>
         )}
 
@@ -273,81 +270,75 @@ export default function Nearby({ user }) {
         {!loading && places.length > 0 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <p className="text-sm text-gray-500 font-medium mb-4">
-              {places[0]?._demo ? 'Setup required' : `${places.length} places found near you`}
+              {places.length} {placeType.label} found within {formatDistance(radius)}
             </p>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {places.map((place, i) => (
-                <motion.div key={place.place_id}
-                  initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.06 }}
-                  whileHover={{ y: -4 }}
-                  className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden cursor-pointer"
-                  onClick={() => !place._demo && openInMaps(place)}>
+              {places.map((place, i) => {
+                const name = place.tags?.name || 'Unnamed'
+                const cuisine = place.tags?.cuisine?.replace(/_/g, ' ') || ''
+                const phone = place.tags?.phone || place.tags?.['contact:phone'] || ''
+                const website = place.tags?.website || place.tags?.['contact:website'] || ''
+                const openingHours = place.tags?.opening_hours || ''
+                return (
+                  <motion.div key={place.id}
+                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    whileHover={{ y: -4 }}
+                    className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
 
-                  {/* Photo */}
-                  <div className="h-36 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative overflow-hidden">
-                    {place.photos?.[0] && GMAPS_KEY ? (
-                      <img
-                        src={`https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${place.photos[0].photo_reference}&key=${GMAPS_KEY}`}
-                        alt={place.name} className="w-full h-full object-cover"
-                        onError={e => { e.target.style.display='none' }}
-                      />
-                    ) : (
-                      <div className="text-5xl">
-                        {placeType === 'cafe' ? '☕' : placeType === 'bakery' ? '🎂' : placeType === 'meal_takeaway' ? '🍕' : '🍽'}
+                    {/* Card top */}
+                    <div className="h-28 flex items-center justify-center relative"
+                      style={{ background: `linear-gradient(135deg, ${['#fef3c7','#dbeafe','#fce7f3','#d1fae5','#ede9fe'][i%5]} 0%, ${['#fde68a','#bfdbfe','#fbcfe8','#a7f3d0','#ddd6fe'][i%5]} 100%)` }}>
+                      <span className="text-5xl">{PLACE_EMOJI[placeType.amenity] || '🍽'}</span>
+                      <div className="absolute top-3 left-3 w-7 h-7 rounded-full bg-gray-900 text-white text-xs font-bold flex items-center justify-center shadow">
+                        {i+1}
                       </div>
-                    )}
-                    {/* Number badge */}
-                    {!place._demo && (
-                      <div className="absolute top-3 left-3 w-7 h-7 rounded-full bg-gray-900 text-white text-xs font-bold flex items-center justify-center">
-                        {i + 1}
-                      </div>
-                    )}
-                    {place.opening_hours?.open_now !== undefined && (
-                      <div className={`absolute top-3 right-3 px-2 py-0.5 rounded-full text-xs font-bold ${place.opening_hours.open_now ? 'bg-green-500 text-white' : 'bg-red-100 text-red-700'}`}>
-                        {place.opening_hours.open_now ? 'Open' : 'Closed'}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-4">
-                    <h3 className="font-bold text-gray-900 text-sm mb-1 leading-tight">{place.name}</h3>
-                    <p className="text-xs text-gray-500 mb-2 flex items-start gap-1">
-                      <FiMapPin size={11} className="flex-shrink-0 mt-0.5" />
-                      {place.vicinity}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      {place.rating > 0 && (
-                        <div className="flex items-center gap-1 text-xs text-gray-600">
-                          <FiStar size={12} style={{ color: '#f59e0b' }} />
-                          <span className="font-semibold">{place.rating}</span>
-                          {place.user_ratings_total && <span className="text-gray-400">({place.user_ratings_total})</span>}
+                      {place._dist && (
+                        <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full text-xs font-bold bg-white/90 text-gray-700">
+                          {formatDistance(place._dist)}
                         </div>
                       )}
-                      {!place._demo && (
-                        <button onClick={(e) => { e.stopPropagation(); openInMaps(place) }}
-                          className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg transition-colors"
-                          style={{ color: '#2563eb', background: '#eff6ff' }}>
-                          <FiNavigation size={11} /> Directions
-                        </button>
-                      )}
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+
+                    <div className="p-4">
+                      <h3 className="font-bold text-gray-900 text-sm mb-1 leading-tight">{name}</h3>
+                      {cuisine && <p className="text-xs text-brand-500 font-medium mb-1 capitalize">{cuisine}</p>}
+                      {openingHours && (
+                        <div className="flex items-start gap-1 text-xs text-gray-500 mb-2">
+                          <FiClock size={11} className="mt-0.5 flex-shrink-0" />
+                          <span className="line-clamp-1">{openingHours}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 mt-3">
+                        <button onClick={() => openDirections(place)}
+                          className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-xl transition-colors"
+                          style={{ background: '#eff6ff', color: '#2563eb' }}>
+                          <FiNavigation size={12} /> Directions
+                        </button>
+                        {website && (
+                          <a href={website.startsWith('http') ? website : `https://${website}`}
+                            target="_blank" rel="noreferrer"
+                            className="flex items-center justify-center gap-1 text-xs font-semibold py-2 px-3 rounded-xl transition-colors"
+                            style={{ background: '#f3f4f6', color: '#6b7280' }}>
+                            <FiExternalLink size={12} />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                )
+              })}
             </div>
           </motion.div>
         )}
 
         {/* Empty state */}
         {!loading && !location && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="text-center py-20">
-            <motion.div animate={{ y: [0, -10, 0] }} transition={{ duration: 2, repeat: Infinity }}
-              className="text-6xl mb-4">📍</motion.div>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-20">
+            <motion.div animate={{ y: [0,-10,0] }} transition={{ duration: 2, repeat: Infinity }} className="text-6xl mb-4">📍</motion.div>
             <h3 className="text-xl font-bold text-gray-800 mb-2">Find food near you</h3>
             <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">
-              Allow location access to discover restaurants, cafés and bakeries nearby.
+              Allow location access to discover restaurants, cafés and bakeries nearby using OpenStreetMap — completely free.
             </p>
             <button onClick={getLocation} disabled={locLoading}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white text-sm"
@@ -355,17 +346,10 @@ export default function Nearby({ user }) {
               <FiMapPin size={16} />
               {locLoading ? 'Getting location…' : 'Allow location access'}
             </button>
+            <p className="text-xs text-gray-400 mt-3">Powered by OpenStreetMap · Free · No API key needed</p>
           </motion.div>
         )}
       </div>
-
-      {/* Load Google Maps script */}
-      {GMAPS_KEY && !window.google && (
-        <script async
-          src={`https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&libraries=places`}
-          onLoad={() => { if (location) searchNearby() }}
-        />
-      )}
     </div>
   )
 }

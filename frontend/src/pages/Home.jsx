@@ -34,8 +34,6 @@ const DIETS = [
   { label: '🥩 Beef',       value: 'Beef' },
   { label: '🐟 Seafood',    value: 'Seafood' },
   { label: '🍮 Dessert',    value: 'Dessert' },
-  { label: '🐑 Lamb',       value: 'Lamb' },
-  { label: '🐷 Pork',       value: 'Pork' },
   { label: '🍝 Pasta',      value: 'Pasta' },
 ]
 
