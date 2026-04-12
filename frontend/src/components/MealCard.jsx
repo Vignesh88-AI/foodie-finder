@@ -58,7 +58,7 @@ function detectVeg(meal) {
   if (NONVEG_KEYWORDS.some(k => name.includes(k))) return 'nonveg'
   if (VEG_KEYWORDS.some(k => name.includes(k)))    return 'veg'
 
-  return null // truly unknown — show no tag
+  return 'veg' // default to veg when we have no evidence of meat
 }
 
 const TAG = {

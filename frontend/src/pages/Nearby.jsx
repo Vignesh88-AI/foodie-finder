@@ -122,7 +122,7 @@ export default function Nearby() {
   const [places, setPlaces]       = useState([])
   const [loading, setLoading]     = useState(false)
   const [locLoading, setLocLoading] = useState(false)
-  const [placeType, setPlaceType] = useState(PLACE_TYPES[0])
+  const [selectedTypes, setSelectedTypes] = useState([PLACE_TYPES[0]])
   const [radius, setRadius]       = useState(1500)
   const [denied, setDenied]       = useState(false)
   const [cityName, setCityName]   = useState('')
@@ -155,7 +155,17 @@ export default function Nearby() {
     if (!location) { toast.error('Please allow location access first'); return }
     setLoading(true); setPlaces([])
     try {
-      const results = await fetchNearbyPlaces(location.lat, location.lng, radius, placeType.amenity)
+      // Search all selected types in parallel
+      const allResults = await Promise.all(
+        selectedTypes.map(pt => fetchNearbyPlaces(location.lat, location.lng, radius, pt.amenity))
+      )
+      const seen = new Set()
+      const results = []
+      for (const typeResults of allResults) {
+        for (const p of typeResults) {
+          if (!seen.has(p.id)) { seen.add(p.id); results.push(p) }
+        }
+      }
       // Sort by distance
       const sorted = results
         .filter(p => p.tags?.name)
@@ -252,7 +262,7 @@ export default function Nearby() {
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
               className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-6"
               style={{ height: 320 }}>
-              <LeafletMap location={location} places={places} activeType={placeType.amenity} />
+              <LeafletMap location={location} places={places} activeType={selectedTypes[0]?.amenity || 'restaurant'} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -270,7 +280,7 @@ export default function Nearby() {
         {!loading && places.length > 0 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <p className="text-sm text-gray-500 font-medium mb-4">
-              {places.length} {placeType.label} found within {formatDistance(radius)}
+              {places.length} places found within {formatDistance(radius)}
             </p>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {places.map((place, i) => {

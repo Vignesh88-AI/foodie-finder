@@ -24,7 +24,7 @@ const CUISINES = [
   { flag: '🇨🇳', name: 'Chinese',  img: 'https://www.themealdb.com/images/media/meals/1529446352.jpg',          bg: '#8B0000' },
   { flag: '🇹🇭', name: 'Thai',     img: 'https://www.themealdb.com/images/media/meals/uuuspp1511297945.jpg',   bg: '#4169E1' },
   { flag: '🇬🇧', name: 'British',  img: 'https://www.themealdb.com/images/media/meals/sywwoj1511461902.jpg',   bg: '#1C1C6E' },
-  { flag: '🇫🇷', name: 'French',   img: 'https://www.themealdb.com/images/media/meals/y0ptem1504792168.jpg',   bg: '#00356B' },
+  { flag: '🇫🇷', name: 'French',   img: 'https://www.themealdb.com/images/media/meals/ssrysq1511558465.jpg',   bg: '#00356B' },
 ]
 
 const FEATURES = [
@@ -340,11 +340,11 @@ export default function Landing() {
                 <motion.div key={c.name} variants={itemVariant}
                   whileHover={{ y:-7, scale:1.02 }}
                   onClick={() => navigate('/signup')}
-                  style={{ borderRadius:20, overflow:'hidden', aspectRatio:'16/10', position:'relative', cursor:'pointer', boxShadow:'0 4px 20px rgba(0,0,0,0.1)' }}>
+                  style={{ borderRadius:20, overflow:'hidden', aspectRatio:'16/10', position:'relative', cursor:'pointer', boxShadow:'0 4px 20px rgba(0,0,0,0.1)', background: c.bg }}>
                   <img
                     src={c.img} alt={c.name}
-                    style={{ width:'100%', height:'100%', objectFit:'cover' }}
-                    onError={e => { e.target.style.display='none'; e.target.parentNode.style.background=c.bg }}
+                    style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}
+                    onError={e => { e.target.style.opacity='0' }}
                   />
                   <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.04) 55%)' }} />
                   <div style={{ position:'absolute', bottom:0, left:0, right:0, padding:'14px 16px', display:'flex', alignItems:'center', gap:8 }}>

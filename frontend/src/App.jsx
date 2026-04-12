@@ -1,3 +1,4 @@
+// Dishcovery v5 - 2026-04-12 11:47
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { onAuthStateChanged } from 'firebase/auth'
