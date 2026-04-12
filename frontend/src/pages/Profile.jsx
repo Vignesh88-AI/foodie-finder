@@ -1,0 +1,281 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth'
+import { collection, query, where, onSnapshot } from 'firebase/firestore'
+import { auth, db } from '../firebase'
+import FoodAvatar, { getAllAvatarSVGs, getAvatarIndex } from '../components/FoodAvatar'
+import toast from 'react-hot-toast'
+import { FiEdit2, FiSave, FiX, FiHeart, FiLock, FiUser, FiMail, FiChevronRight, FiArrowLeft } from 'react-icons/fi'
+
+const AVATAR_NAMES = ['Ramen', 'Pizza', 'Sushi', 'Burger', 'Biryani', 'Taco', 'Donut', 'Avocado', 'Ice Cream', 'Pineapple']
+
+export default function Profile({ user }) {
+  const navigate    = useNavigate()
+  const [favCount, setFavCount]         = useState(0)
+  const [displayName, setDisplayName]   = useState(user?.displayName || '')
+  const [editingName, setEditingName]   = useState(false)
+  const [savingName, setSavingName]     = useState(false)
+  const [showAvatarPicker, setShowAvatar] = useState(false)
+  const [selectedAvatar, setSelectedAvatar] = useState(getAvatarIndex(user))
+  const [activeTab, setActiveTab]       = useState('profile') // 'profile' | 'security'
+  const [currentPass, setCurrentPass]   = useState('')
+  const [newPass, setNewPass]           = useState('')
+  const [confirmPass, setConfirmPass]   = useState('')
+  const [savingPass, setSavingPass]     = useState(false)
+
+  const allAvatars = getAllAvatarSVGs(72)
+
+  useEffect(() => {
+    if (!user) return
+    const q = query(collection(db, 'favorites'), where('uid', '==', user.uid))
+    const unsub = onSnapshot(q, snap => setFavCount(snap.size))
+    return unsub
+  }, [user])
+
+  const saveName = async () => {
+    if (!displayName.trim()) return
+    setSavingName(true)
+    try {
+      await updateProfile(auth.currentUser, { displayName: displayName.trim() })
+      toast.success('Name updated!')
+      setEditingName(false)
+    } catch {
+      toast.error('Could not update name.')
+    } finally {
+      setSavingName(false)
+    }
+  }
+
+  const savePassword = async () => {
+    if (newPass !== confirmPass) { toast.error('Passwords do not match.'); return }
+    if (newPass.length < 6)     { toast.error('Password must be at least 6 characters.'); return }
+    setSavingPass(true)
+    try {
+      const cred = EmailAuthProvider.credential(user.email, currentPass)
+      await reauthenticateWithCredential(auth.currentUser, cred)
+      await updatePassword(auth.currentUser, newPass)
+      toast.success('Password updated!')
+      setCurrentPass(''); setNewPass(''); setConfirmPass('')
+    } catch (err) {
+      if (err.code === 'auth/wrong-password') toast.error('Current password is wrong.')
+      else toast.error('Could not update password.')
+    } finally {
+      setSavingPass(false)
+    }
+  }
+
+  const memberSince = user?.metadata?.creationTime
+    ? new Date(user.metadata.creationTime).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+    : 'Recently'
+
+  return (
+    <div className="min-h-screen bg-gray-50 pb-16">
+      <div className="max-w-2xl mx-auto px-4 pt-8">
+
+        {/* Back */}
+        <button onClick={() => navigate('/home')}
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6 transition-colors">
+          <FiArrowLeft size={16} /> Back to home
+        </button>
+
+        {/* Profile card */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 mb-6">
+
+          {/* Cover gradient */}
+          <div style={{ height: 100, background: 'linear-gradient(135deg, #D85A30, #FF8A50)' }} />
+
+          {/* Avatar + info */}
+          <div className="px-6 pb-6">
+            <div className="flex items-end justify-between -mt-12 mb-4">
+              <div className="relative">
+                <div className="rounded-3xl overflow-hidden border-4 border-white shadow-lg"
+                  style={{ width: 88, height: 88 }}>
+                  <FoodAvatar user={user} size={88} selectedIndex={selectedAvatar} />
+                </div>
+                <button onClick={() => setShowAvatar(true)}
+                  className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brand-500 text-white flex items-center justify-center shadow-md hover:bg-brand-600 transition-colors"
+                  title="Change avatar">
+                  <FiEdit2 size={12} />
+                </button>
+              </div>
+
+              {/* Stats */}
+              <div className="flex gap-6 text-center pb-2">
+                <div>
+                  <div className="text-xl font-bold text-gray-900">{favCount}</div>
+                  <div className="text-xs text-gray-400">Saved</div>
+                </div>
+                <div>
+                  <div className="text-xl font-bold text-gray-900">🌍</div>
+                  <div className="text-xs text-gray-400">Explorer</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Name */}
+            <div className="mb-1">
+              {editingName ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    value={displayName}
+                    onChange={e => setDisplayName(e.target.value)}
+                    className="input flex-1 text-lg font-bold py-1.5"
+                    onKeyDown={e => e.key === 'Enter' && saveName()}
+                    autoFocus
+                  />
+                  <button onClick={saveName} disabled={savingName}
+                    className="p-2 rounded-xl bg-brand-500 text-white hover:bg-brand-600 transition-colors">
+                    <FiSave size={16} />
+                  </button>
+                  <button onClick={() => { setEditingName(false); setDisplayName(user?.displayName || '') }}
+                    className="p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                    <FiX size={16} />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold text-gray-900">{user?.displayName || 'Foodie'}</h1>
+                  <button onClick={() => setEditingName(true)}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-brand-500 hover:bg-brand-50 transition-colors">
+                    <FiEdit2 size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+            <p className="text-sm text-gray-400 mb-1">{user?.email}</p>
+            <p className="text-xs text-gray-300">Member since {memberSince}</p>
+          </div>
+        </motion.div>
+
+        {/* Avatar picker modal */}
+        <AnimatePresence>
+          {showAvatarPicker && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)' }}>
+              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }} transition={{ duration: 0.25, ease: [0.22,1,0.36,1] }}
+                className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="font-bold text-gray-900 text-lg">Choose your food avatar</h3>
+                  <button onClick={() => setShowAvatar(false)}
+                    className="p-1.5 rounded-xl text-gray-400 hover:bg-gray-100">
+                    <FiX size={18} />
+                  </button>
+                </div>
+                <div className="grid grid-cols-5 gap-3 mb-5">
+                  {allAvatars.map((svg, i) => (
+                    <motion.button key={i} whileTap={{ scale: 0.9 }}
+                      onClick={() => setSelectedAvatar(i)}
+                      className="flex flex-col items-center gap-1.5"
+                    >
+                      <div className={`rounded-2xl overflow-hidden border-2 transition-all ${selectedAvatar === i ? 'border-brand-500 shadow-lg scale-110' : 'border-transparent hover:border-gray-200'}`}
+                        style={{ width: 52, height: 52 }}
+                        dangerouslySetInnerHTML={{ __html: svg }} />
+                      <span className="text-xs text-gray-400" style={{ fontSize: 9 }}>{AVATAR_NAMES[i]}</span>
+                    </motion.button>
+                  ))}
+                </div>
+                <button onClick={() => {
+                  toast.success(`${AVATAR_NAMES[selectedAvatar]} avatar selected!`)
+                  setShowAvatar(false)
+                }} className="btn-primary w-full">
+                  Save avatar
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Tabs */}
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-6">
+          {[['profile', FiUser, 'Profile'], ['security', FiLock, 'Security']].map(([t, Icon, label]) => (
+            <button key={t} onClick={() => setActiveTab(t)}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                activeTab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}>
+              <Icon size={15} /> {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Profile tab */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'profile' && (
+            <motion.div key="profile" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm mb-4">
+                <div className="px-5 py-4 border-b border-gray-50">
+                  <h3 className="font-semibold text-gray-800">Account info</h3>
+                </div>
+                {[
+                  { icon: FiUser,  label: 'Display name', value: user?.displayName || 'Not set' },
+                  { icon: FiMail,  label: 'Email',        value: user?.email },
+                  { icon: FiHeart, label: 'Saved meals',  value: `${favCount} meals` },
+                ].map(({ icon: Icon, label, value }) => (
+                  <div key={label} className="flex items-center gap-4 px-5 py-4 border-b border-gray-50 last:border-0">
+                    <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-500 flex items-center justify-center">
+                      <Icon size={16} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-400 mb-0.5">{label}</p>
+                      <p className="text-sm font-medium text-gray-800 truncate">{value}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Quick links */}
+              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                <div className="px-5 py-4 border-b border-gray-50">
+                  <h3 className="font-semibold text-gray-800">Quick links</h3>
+                </div>
+                {[
+                  { label: 'My saved meals', icon: FiHeart, action: () => navigate('/favorites'), color: 'text-brand-500', bg: 'bg-brand-50' },
+                  { label: 'Browse all cuisines', icon: FiUser, action: () => navigate('/home'), color: 'text-blue-500', bg: 'bg-blue-50' },
+                ].map(({ label, icon: Icon, action, color, bg }) => (
+                  <button key={label} onClick={action}
+                    className="w-full flex items-center gap-4 px-5 py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors text-left">
+                    <div className={`w-9 h-9 rounded-xl ${bg} ${color} flex items-center justify-center`}>
+                      <Icon size={16} />
+                    </div>
+                    <span className="flex-1 text-sm font-medium text-gray-800">{label}</span>
+                    <FiChevronRight size={16} className="text-gray-300" />
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Security tab */}
+          {activeTab === 'security' && (
+            <motion.div key="security" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                <h3 className="font-semibold text-gray-800 mb-4">Change password</h3>
+                <div className="space-y-3">
+                  {[
+                    { label: 'Current password', val: currentPass, set: setCurrentPass, ph: '••••••••' },
+                    { label: 'New password',      val: newPass,     set: setNewPass,     ph: 'Min. 6 characters' },
+                    { label: 'Confirm new password', val: confirmPass, set: setConfirmPass, ph: 'Repeat new password' },
+                  ].map(({ label, val, set, ph }) => (
+                    <div key={label}>
+                      <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}</label>
+                      <input type="password" value={val} onChange={e => set(e.target.value)}
+                        placeholder={ph} className="input" />
+                    </div>
+                  ))}
+                  <button onClick={savePassword} disabled={savingPass}
+                    className="btn-primary w-full mt-2">
+                    {savingPass ? 'Updating…' : 'Update password'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+      </div>
+    </div>
+  )
+}

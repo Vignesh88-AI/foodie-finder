@@ -83,10 +83,13 @@ export default function Home({ user }) {
     setActiveQuery('')
     setSource('mealdb')
     try {
+      // Fetch by area AND by specific diet categories to get category info
       const areas = ['Indian', 'Italian', 'Chinese', 'Mexican', 'Japanese', 'Thai', 'British', 'French', 'American', 'Greek']
-      const results = await Promise.all(areas.map(a => fetch(`${MEALDB}/filter.php?a=${a}`).then(r => r.json())))
-      const combined = results.flatMap((r, i) => (r.meals || []).slice(0, 6))
-        .sort(() => Math.random() - 0.5)
+      const areaResults = await Promise.all(areas.map(a => fetch(`${MEALDB}/filter.php?a=${a}`).then(r => r.json())))
+      // Tag each meal with its area so name-based detection has area context
+      const combined = areaResults.flatMap((r, i) =>
+        (r.meals || []).slice(0, 5).map(m => ({ ...m, strArea: areas[i] }))
+      ).sort(() => Math.random() - 0.5)
       setAllMeals(combined)
       setMeals(combined.slice(0, PAGE_SIZE))
       setHasMore(combined.length > PAGE_SIZE)
@@ -164,7 +167,7 @@ export default function Home({ user }) {
     try {
       const res  = await fetch(`${MEALDB}/filter.php?a=${encodeURIComponent(c.value)}`)
       const data = await res.json()
-      const found = data.meals || []
+      const found = (data.meals || []).map(m => ({ ...m, strArea: c.value }))
       setAllMeals(found)
       setMeals(found.slice(0, PAGE_SIZE))
       setHasMore(found.length > PAGE_SIZE)

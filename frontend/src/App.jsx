@@ -11,11 +11,12 @@ import Signup      from './pages/Signup'
 import Home        from './pages/Home'
 import MealDetails from './pages/MealDetails'
 import Favorites   from './pages/Favorites'
+import Profile     from './pages/Profile'
 
 function PrivateRoute({ user, loading, children }) {
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#D85A30', borderTopColor: 'transparent' }} />
     </div>
   )
   return user ? children : <Navigate to="/login" replace />
@@ -35,41 +36,23 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: { borderRadius: '12px', fontSize: '14px' },
-          success: { iconTheme: { primary: '#D85A30', secondary: '#fff' } }
-        }}
-      />
+      <Toaster position="top-right" toastOptions={{
+        style: { borderRadius: '12px', fontSize: '14px' },
+        success: { iconTheme: { primary: '#D85A30', secondary: '#fff' } }
+      }} />
 
       {user && <Navbar user={user} />}
 
       <Routes>
-        <Route path="/"
-          element={user ? <Navigate to="/home" replace /> : <Landing />}
-        />
-        <Route path="/login"
-          element={user ? <Navigate to="/home" replace /> : <Login />}
-        />
-        <Route path="/signup"
-          element={user ? <Navigate to="/home" replace /> : <Signup />}
-        />
-        <Route path="/home" element={
-          <PrivateRoute user={user} loading={loading}>
-            <Home user={user} />
-          </PrivateRoute>
-        } />
-        <Route path="/meal/:id" element={
-          <PrivateRoute user={user} loading={loading}>
-            <MealDetails user={user} />
-          </PrivateRoute>
-        } />
-        <Route path="/favorites" element={
-          <PrivateRoute user={user} loading={loading}>
-            <Favorites user={user} />
-          </PrivateRoute>
-        } />
+        <Route path="/"        element={user ? <Navigate to="/home" replace /> : <Landing />} />
+        <Route path="/login"   element={user ? <Navigate to="/home" replace /> : <Login />} />
+        <Route path="/signup"  element={user ? <Navigate to="/home" replace /> : <Signup />} />
+
+        <Route path="/home" element={<PrivateRoute user={user} loading={loading}><Home user={user} /></PrivateRoute>} />
+        <Route path="/meal/:id" element={<PrivateRoute user={user} loading={loading}><MealDetails user={user} /></PrivateRoute>} />
+        <Route path="/favorites" element={<PrivateRoute user={user} loading={loading}><Favorites user={user} /></PrivateRoute>} />
+        <Route path="/profile"   element={<PrivateRoute user={user} loading={loading}><Profile user={user} /></PrivateRoute>} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
