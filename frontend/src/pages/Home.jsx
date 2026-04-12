@@ -15,43 +15,43 @@ const PAGE_SIZE = 20
 
 // #19 — All 37 MealDB countries
 const CUISINES = [
-  { label: 'All cuisines',    value: null,              spoonacular: null,             edamam: null },
-  { label: '🇮🇳 Indian',      value: 'Indian',          spoonacular: 'Indian',         edamam: 'indian' },
-  { label: '🇮🇹 Italian',     value: 'Italian',         spoonacular: 'Italian',        edamam: 'italian' },
-  { label: '🇨🇳 Chinese',     value: 'Chinese',         spoonacular: 'Chinese',        edamam: 'chinese' },
-  { label: '🇲🇽 Mexican',     value: 'Mexican',         spoonacular: 'Mexican',        edamam: 'mexican' },
-  { label: '🇯🇵 Japanese',    value: 'Japanese',        spoonacular: 'Japanese',       edamam: 'japanese' },
-  { label: '🇹🇭 Thai',        value: 'Thai',            spoonacular: 'Thai',           edamam: 'south east asian' },
-  { label: '🇬🇧 British',     value: 'British',         spoonacular: 'British',        edamam: 'british' },
-  { label: '🇫🇷 French',      value: 'French',          spoonacular: 'French',         edamam: 'french' },
-  { label: '🇺🇸 American',    value: 'American',        spoonacular: 'American',       edamam: 'american' },
-  { label: '🇬🇷 Greek',       value: 'Greek',           spoonacular: 'Greek',          edamam: 'mediterranean' },
-  { label: '🇪🇸 Spanish',     value: 'Spanish',         spoonacular: 'Spanish',        edamam: 'mediterranean' },
-  { label: '🇵🇱 Polish',      value: 'Polish',          spoonacular: null,             edamam: null },
-  { label: '🇨🇦 Canadian',    value: 'Canadian',        spoonacular: null,             edamam: null },
-  { label: '🇯🇲 Jamaican',    value: 'Jamaican',        spoonacular: null,             edamam: null },
-  { label: '🇪🇬 Egyptian',    value: 'Egyptian',        spoonacular: 'Middle Eastern', edamam: 'middle eastern' },
-  { label: '🇲🇦 Moroccan',    value: 'Moroccan',        spoonacular: 'Middle Eastern', edamam: 'middle eastern' },
-  { label: '🇵🇭 Filipino',    value: 'Filipino',        spoonacular: null,             edamam: 'south east asian' },
-  { label: '🇹🇷 Turkish',     value: 'Turkish',         spoonacular: 'Middle Eastern', edamam: 'middle eastern' },
-  { label: '🇷🇺 Russian',     value: 'Russian',         spoonacular: null,             edamam: null },
-  { label: '🇺🇦 Ukrainian',   value: 'Ukrainian',       spoonacular: null,             edamam: null },
-  { label: '🇻🇳 Vietnamese',  value: 'Vietnamese',      spoonacular: 'Vietnamese',     edamam: 'south east asian' },
-  { label: '🇮🇪 Irish',       value: 'Irish',           spoonacular: null,             edamam: null },
-  { label: '🇳🇱 Dutch',       value: 'Dutch',           spoonacular: null,             edamam: null },
-  { label: '🇭🇷 Croatian',    value: 'Croatian',        spoonacular: null,             edamam: null },
-  { label: '🇵🇹 Portuguese',  value: 'Portuguese',      spoonacular: null,             edamam: null },
-  { label: '🇦🇷 Argentinian', value: 'Argentinian',     spoonacular: null,             edamam: null },
-  { label: '🇲🇾 Malaysian',   value: 'Malaysian',       spoonacular: null,             edamam: 'south east asian' },
-  { label: '🇰🇷 Korean',      value: 'Korean',          spoonacular: 'Korean',         edamam: 'south east asian' },
-  { label: '🇸🇦 Saudi',       value: 'Saudi',           spoonacular: 'Middle Eastern', edamam: 'middle eastern' },
-  { label: '🇲🇴 Macanese',    value: 'Macanese',        spoonacular: null,             edamam: null },
-  { label: '🌍 Kenyan',       value: 'Kenyan',          spoonacular: null,             edamam: null },
-  { label: '🇹🇳 Tunisian',    value: 'Tunisian',        spoonacular: null,             edamam: null },
-  { label: '🇸🇾 Syrian',      value: 'Syrian',          spoonacular: 'Middle Eastern', edamam: 'middle eastern' },
-  { label: '🇧🇦 Bosnian',     value: 'Bosnian',         spoonacular: null,             edamam: null },
-  { label: '🇭🇰 Hong Kong',   value: 'Hong_Kong',       spoonacular: null,             edamam: null },
-  { label: '🇩🇿 Algerian',    value: 'Algerian',        spoonacular: null,             edamam: null },
+  { label: 'All cuisines',    value: null,              spoonacular: null },
+  { label: '🇮🇳 Indian',      value: 'Indian',          spoonacular: 'Indian' },
+  { label: '🇮🇹 Italian',     value: 'Italian',         spoonacular: 'Italian' },
+  { label: '🇨🇳 Chinese',     value: 'Chinese',         spoonacular: 'Chinese' },
+  { label: '🇲🇽 Mexican',     value: 'Mexican',         spoonacular: 'Mexican' },
+  { label: '🇯🇵 Japanese',    value: 'Japanese',        spoonacular: 'Japanese' },
+  { label: '🇹🇭 Thai',        value: 'Thai',            spoonacular: 'Thai' },
+  { label: '🇬🇧 British',     value: 'British',         spoonacular: 'British' },
+  { label: '🇫🇷 French',      value: 'French',          spoonacular: 'French' },
+  { label: '🇺🇸 American',    value: 'American',        spoonacular: 'American' },
+  { label: '🇬🇷 Greek',       value: 'Greek',           spoonacular: 'Greek' },
+  { label: '🇪🇸 Spanish',     value: 'Spanish',         spoonacular: 'Spanish' },
+  { label: '🇵🇱 Polish',      value: 'Polish',          spoonacular: null },
+  { label: '🇨🇦 Canadian',    value: 'Canadian',        spoonacular: null },
+  { label: '🇯🇲 Jamaican',    value: 'Jamaican',        spoonacular: null },
+  { label: '🇪🇬 Egyptian',    value: 'Egyptian',        spoonacular: 'Middle Eastern' },
+  { label: '🇲🇦 Moroccan',    value: 'Moroccan',        spoonacular: 'Middle Eastern' },
+  { label: '🇵🇭 Filipino',    value: 'Filipino',        spoonacular: null },
+  { label: '🇹🇷 Turkish',     value: 'Turkish',         spoonacular: 'Middle Eastern' },
+  { label: '🇷🇺 Russian',     value: 'Russian',         spoonacular: null },
+  { label: '🇺🇦 Ukrainian',   value: 'Ukrainian',       spoonacular: null },
+  { label: '🇻🇳 Vietnamese',  value: 'Vietnamese',      spoonacular: 'Vietnamese' },
+  { label: '🇮🇪 Irish',       value: 'Irish',           spoonacular: null },
+  { label: '🇳🇱 Dutch',       value: 'Dutch',           spoonacular: null },
+  { label: '🇭🇷 Croatian',    value: 'Croatian',        spoonacular: null },
+  { label: '🇵🇹 Portuguese',  value: 'Portuguese',      spoonacular: null },
+  { label: '🇦🇷 Argentinian', value: 'Argentinian',     spoonacular: null },
+  { label: '🇲🇾 Malaysian',   value: 'Malaysian',       spoonacular: null },
+  { label: '🇰🇷 Korean',      value: 'Korean',          spoonacular: 'Korean' },
+  { label: '🇸🇦 Saudi',       value: 'Saudi',           spoonacular: 'Middle Eastern' },
+  { label: '🇲🇴 Macanese',    value: 'Macanese',        spoonacular: null },
+  { label: '🌍 Kenyan',       value: 'Kenyan',          spoonacular: null },
+  { label: '🇹🇳 Tunisian',    value: 'Tunisian',        spoonacular: null },
+  { label: '🇸🇾 Syrian',      value: 'Syrian',          spoonacular: 'Middle Eastern' },
+  { label: '🇧🇦 Bosnian',     value: 'Bosnian',         spoonacular: null },
+  { label: '🇭🇰 Hong Kong',   value: 'Hong_Kong',       spoonacular: null },
+  { label: '🇩🇿 Algerian',    value: 'Algerian',        spoonacular: null },
 ]
 
 const DIETS = [
@@ -85,20 +85,7 @@ async function spoonCuisine(cuisine, offset=0) {
   const data = await res.json(); if(data.error) throw new Error(data.error)
   return { meals:(data.results||[]).map(spoonToMeal), total:data.totalResults||0, hasMore:offset+PAGE_SIZE<(data.totalResults||0), nextOffset:offset+PAGE_SIZE }
 }
-async function edamamSearch(q, from=0) {
-  const res = await fetch(`${API}/api/edamam/search?q=${encodeURIComponent(q)}&from=${from}&to=${from+PAGE_SIZE}`)
-  if(!res.ok) throw new Error('Edamam failed')
-  const data = await res.json()
-  return { meals:data.results||[], total:data.count||0, hasMore:(data.to||0)<(data.count||0), nextOffset:data.to||0 }
-}
-async function edamamCuisine(cuisineType, from=0) {
-  const res = await fetch(`${API}/api/edamam/cuisine?cuisineType=${encodeURIComponent(cuisineType)}&from=${from}&to=${from+PAGE_SIZE}`)
-  if(!res.ok) throw new Error('Edamam cuisine failed')
-  const data = await res.json()
-  return { meals:data.results||[], total:data.count||0, hasMore:!!data.nextPage, nextOffset:from+PAGE_SIZE }
-}
 
-// #12 — Search history helpers
 const getSearchHistory = () => { try { return JSON.parse(localStorage.getItem('dishcovery_search_history')||'[]') } catch { return [] } }
 const saveSearchHistory = (q) => {
   const h = getSearchHistory()
@@ -286,8 +273,6 @@ export default function Home({ user }) {
 
     // 1. Spoonacular
     try { const res=await spoonSearch(q,0); if(res.meals.length>0){setMeals(res.meals);setHasMore(res.hasMore);setNextOffset(res.nextOffset);setTotalCount(res.total);setApiSource('spoon');setLoading(false);return} } catch {}
-    // 2. Edamam
-    try { const res=await edamamSearch(q,0); if(res.meals.length>0){setMeals(res.meals);setHasMore(res.hasMore);setNextOffset(res.nextOffset);setTotalCount(res.total);setApiSource('edamam');setLoading(false);return} } catch {}
     // 3. MealDB
     try {
       const r=await fetch(`${MEALDB}/search.php?s=${encodeURIComponent(q)}`).then(r=>r.json())
@@ -312,7 +297,6 @@ export default function Home({ user }) {
     setLoading(true); setMode('cuisine')
     const c=CUISINES.find(x=>x.value===val)
     try { if(c?.spoonacular){const res=await spoonCuisine(c.spoonacular,0);if(res.meals.length>0){setMeals(res.meals);setHasMore(res.hasMore);setNextOffset(res.nextOffset);setTotalCount(res.total);setApiSource('spoon');setLoading(false);return}} } catch {}
-    try { if(c?.edamam){const res=await edamamCuisine(c.edamam,0);if(res.meals.length>0){setMeals(res.meals);setHasMore(res.hasMore);setNextOffset(res.nextOffset);setTotalCount(res.total);setApiSource('edamam');setLoading(false);return}} } catch {}
     try {
       const r=await fetch(`${API}/api/filter?a=${encodeURIComponent(val)}`).then(r=>r.json())
       const found=(r.meals||[]).map(m=>({...m,strArea:val}))
@@ -343,14 +327,7 @@ export default function Home({ user }) {
         if(mode==='search') res=await spoonSearch(activeQuery,nextOffset)
         else if(mode==='cuisine'){const c=CUISINES.find(x=>x.value===cuisine);res=await spoonCuisine(c?.spoonacular||'',nextOffset)}
         else res=await spoonSearch('',nextOffset)
-        setMeals(prev=>[...prev,...res.meals]); setHasMore(res.hasMore); setNextOffset(res.nextOffset)
-      } else if (apiSource==='edamam') {
-        let res
-        if(mode==='search') res=await edamamSearch(activeQuery,nextOffset)
-        else if(mode==='cuisine'){const c=CUISINES.find(x=>x.value===cuisine);res=await edamamCuisine(c?.edamam||'',nextOffset)}
-        else res=await edamamSearch('popular',nextOffset)
-        setMeals(prev=>[...prev,...res.meals]); setHasMore(res.hasMore); setNextOffset(res.nextOffset)
-      } else if (apiSource === 'mealdb') {
+        setMeals(prev=>[...prev,...res.meals]); setHasMore(res.hasMore); setNextOffset(res.nextOffset)} else if (apiSource === 'mealdb') {
         setHasMore(false) // MealDB filter results can't paginate
       } else {
         setHasMore(false)
@@ -385,7 +362,6 @@ export default function Home({ user }) {
       Promise.resolve()
         .then(async () => {
           try { const res=await spoonSearch(q,0); if(res.meals.length>0){setMeals(res.meals);setHasMore(res.hasMore);setNextOffset(res.nextOffset);setTotalCount(res.total);setApiSource('spoon');return} } catch {}
-          try { const res=await edamamSearch(q,0); if(res.meals.length>0){setMeals(res.meals);setHasMore(res.hasMore);setNextOffset(res.nextOffset);setTotalCount(res.total);setApiSource('edamam');return} } catch {}
           try {
             const r=await fetch(`${MEALDB}/search.php?s=${encodeURIComponent(q)}`).then(r=>r.json())
             const found=r.meals||[]; setMeals(found); setHasMore(false); setTotalCount(found.length); setApiSource('mealdb')
@@ -408,7 +384,7 @@ export default function Home({ user }) {
             Find your next favourite meal
           </h1>
           <p className="text-orange-100 text-sm mb-6">
-            Search anything — chole bhature, biryani, pasta, tacos. Powered by Spoonacular + Edamam
+            Search anything — chole bhature, biryani, pasta, tacos. Powered by Spoonacular + MealDB
           </p>
           {/* #12 — Search with history */}
           <div ref={searchRef} className="relative">

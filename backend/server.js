@@ -8,11 +8,6 @@ const MEALDB = process.env.MEALDB_BASE_URL || 'https://www.themealdb.com/api/jso
 const SPOON  = process.env.SPOONACULAR_API_KEY || ''
 const SPOON_URL = 'https://api.spoonacular.com'
 
-// Edamam demo keys (fallback when Spoonacular not configured)
-const EDAMAM_ID  = process.env.EDAMAM_APP_ID  || 'f77c7e0e'
-const EDAMAM_KEY = process.env.EDAMAM_APP_KEY || '43e8d41a5b2ed56c8d6d782c1d900e3e'
-const EDAMAM_URL = 'https://api.edamam.com/api/recipes/v2'
-
 app.use(cors())
 app.use(express.json())
 
@@ -21,7 +16,6 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     spoonacular: !!SPOON,
-    edamam: !!(EDAMAM_ID && EDAMAM_KEY),
   })
 })
 
@@ -83,64 +77,6 @@ app.get('/api/spoon/recipe/:id', async (req, res) => {
     res.json(data)
   } catch (err) {
     res.status(500).json({ error: 'Spoonacular recipe failed' })
-  }
-})
-
-// ── Edamam: search (fallback when Spoonacular not set) ────────────────────
-app.get('/api/edamam/search', async (req, res) => {
-  try {
-    const { q, from = 0, to = 20 } = req.query
-    const params = new URLSearchParams({
-      type: 'public', q: q || '',
-      app_id: EDAMAM_ID, app_key: EDAMAM_KEY,
-      from, to,
-    })
-    const response = await fetch(`${EDAMAM_URL}?${params}`)
-    const data = await response.json()
-    if (!response.ok) return res.status(response.status).json({ error: data.message || 'Edamam error' })
-    const results = (data.hits || []).map(hit => ({
-      idMeal: hit.recipe.uri.split('_')[1],
-      strMeal: hit.recipe.label,
-      strMealThumb: hit.recipe.images?.REGULAR?.url || hit.recipe.images?.SMALL?.url || hit.recipe.image,
-      strArea: hit.recipe.cuisineType?.[0] || '',
-      strCategory: hit.recipe.dishType?.[0] || '',
-      calories: Math.round(hit.recipe.calories / (hit.recipe.yield || 1)),
-      vegetarian: hit.recipe.healthLabels?.includes('Vegetarian') || false,
-      vegan: hit.recipe.healthLabels?.includes('Vegan') || false,
-      sourceUrl: hit.recipe.url,
-      _source: 'edamam',
-    }))
-    res.json({ results, count: data.count || 0, from: data.from || 0, to: data.to || 0, nextPage: data._links?.next?.href || null })
-  } catch (err) {
-    res.status(500).json({ error: 'Edamam search failed' })
-  }
-})
-
-// ── Edamam: cuisine browse ─────────────────────────────────────────────────
-app.get('/api/edamam/cuisine', async (req, res) => {
-  try {
-    const { cuisineType, from = 0, to = 20 } = req.query
-    const params = new URLSearchParams({
-      type: 'public', q: cuisineType || 'food',
-      app_id: EDAMAM_ID, app_key: EDAMAM_KEY,
-      from, to, cuisineType: cuisineType || '',
-    })
-    const response = await fetch(`${EDAMAM_URL}?${params}`)
-    const data = await response.json()
-    const results = (data.hits || []).map(hit => ({
-      idMeal: hit.recipe.uri.split('_')[1],
-      strMeal: hit.recipe.label,
-      strMealThumb: hit.recipe.images?.REGULAR?.url || hit.recipe.images?.SMALL?.url || hit.recipe.image,
-      strArea: hit.recipe.cuisineType?.[0] || cuisineType,
-      strCategory: hit.recipe.dishType?.[0] || '',
-      calories: Math.round(hit.recipe.calories / (hit.recipe.yield || 1)),
-      vegetarian: hit.recipe.healthLabels?.includes('Vegetarian') || false,
-      vegan: hit.recipe.healthLabels?.includes('Vegan') || false,
-      _source: 'edamam',
-    }))
-    res.json({ results, count: data.count || 0, nextPage: data._links?.next?.href || null })
-  } catch (err) {
-    res.status(500).json({ error: 'Edamam cuisine failed' })
   }
 })
 
@@ -222,6 +158,80 @@ app.post('/api/suggest', async (req, res) => {
     const d = await r.json()
     res.json({ suggestion: d.choices?.[0]?.message?.content || '' })
   } catch { res.status(500).json({ error: 'Suggestion failed' }) }
+})
+
+
+// ── Calorie Calculator (USDA FoodData Central — 100% free, no signup) ─────
+// Uses the public demo key. For production get a free key at fdc.nal.usda.gov/api-guide
+const USDA_KEY = process.env.USDA_API_KEY || 'DEMO_KEY'
+
+app.post('/api/nutrition', async (req, res) => {
+  try {
+    const { ingredients } = req.body
+    if (!ingredients?.length) return res.status(400).json({ error: 'No ingredients' })
+
+    // Look up each ingredient in USDA database and sum nutrients
+    const results = await Promise.allSettled(
+      ingredients.slice(0, 15).map(async (ing) => {
+        // Clean ingredient name (remove quantities like "2 cups", "1 tbsp")
+        const name = ing.replace(/^[\d./\s]+(cup|tbsp|tsp|oz|g|kg|lb|ml|l|clove|bunch|pinch|handful|slice|piece|can|large|medium|small|whole|fresh|dried|chopped|minced|diced|grated|cooked|raw|to taste)s?\s*/gi, '').trim()
+        if (!name || name.length < 2) return null
+
+        const searchRes = await fetch(
+          `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(name)}&pageSize=1&dataType=SR%20Legacy,Foundation&api_key=${USDA_KEY}`,
+          { signal: AbortSignal.timeout(4000) }
+        )
+        if (!searchRes.ok) return null
+        const data = await searchRes.json()
+        const food = data.foods?.[0]
+        if (!food) return null
+
+        const getNutrient = (id) => food.foodNutrients?.find(n => n.nutrientId === id)?.value || 0
+
+        return {
+          name: food.description,
+          original: ing,
+          calories: Math.round(getNutrient(1008)),  // Energy kcal
+          protein:  Math.round(getNutrient(1003) * 10) / 10,  // Protein
+          carbs:    Math.round(getNutrient(1005) * 10) / 10,  // Carbohydrate
+          fat:      Math.round(getNutrient(1004) * 10) / 10,  // Total fat
+          fiber:    Math.round(getNutrient(1079) * 10) / 10,  // Fiber
+          sodium:   Math.round(getNutrient(1093)),             // Sodium mg
+        }
+      })
+    )
+
+    const breakdown = results
+      .filter(r => r.status === 'fulfilled' && r.value)
+      .map(r => r.value)
+
+    if (!breakdown.length) {
+      return res.status(404).json({ error: 'Could not find nutrition data for these ingredients' })
+    }
+
+    const totals = breakdown.reduce((acc, f) => ({
+      calories: acc.calories + f.calories,
+      protein:  acc.protein  + f.protein,
+      carbs:    acc.carbs    + f.carbs,
+      fat:      acc.fat      + f.fat,
+      fiber:    acc.fiber    + f.fiber,
+      sodium:   acc.sodium   + f.sodium,
+    }), { calories:0, protein:0, carbs:0, fat:0, fiber:0, sodium:0 })
+
+    const servings = req.body.servings || 4
+    const perServing = {
+      calories: Math.round(totals.calories / servings),
+      protein:  Math.round(totals.protein  / servings * 10) / 10,
+      carbs:    Math.round(totals.carbs    / servings * 10) / 10,
+      fat:      Math.round(totals.fat      / servings * 10) / 10,
+      fiber:    Math.round(totals.fiber    / servings * 10) / 10,
+    }
+
+    res.json({ totals, perServing, breakdown, servings, source: 'USDA FoodData Central' })
+  } catch (err) {
+    console.error('Nutrition error:', err)
+    res.status(500).json({ error: 'Nutrition lookup failed' })
+  }
 })
 
 app.listen(PORT, () => console.log(`🍽  Dishcovery backend on port ${PORT} | Spoonacular: ${!!SPOON}`))

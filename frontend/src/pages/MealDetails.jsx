@@ -22,12 +22,17 @@ export default function MealDetails({ user }) {
   const [favDocId, setFavDocId]   = useState(null)
   const [saving, setSaving]       = useState(false)
   const [checked, setChecked]     = useState({})
-  const [similarMeals, setSimilar] = useState([])
-  const [favMap, setFavMap]       = useState({})
+  const [similarMeals, setSimilar]   = useState([])
+  const [favMap, setFavMap]         = useState({})
+  const [nutrition, setNutrition]   = useState(null)
+  const [nutLoading, setNutLoading] = useState(false)
+  const [nutError, setNutError]     = useState(false)
+  const [servings, setServings]     = useState(4)
+  const [showBreakdown, setShowBreakdown] = useState(false)
 
   useEffect(() => {
     const fetchMeal = async () => {
-      setLoading(true); setChecked({})
+      setLoading(true); setChecked({}); setNutrition(null); setNutError(false); setServings(4); setShowBreakdown(false)
       try {
         let data
         if (id.startsWith('spoon-')) {
@@ -50,6 +55,28 @@ export default function MealDetails({ user }) {
           data = json.meals?.[0]||null
         }
         setMeal(data)
+        // Fetch nutrition from USDA (free, no key needed with DEMO_KEY)
+        if (data) {
+          setNutLoading(true)
+          const ingList = data._ingredients
+            ? data._ingredients.map(i => i.measure ? `${i.measure} ${i.ingredient}` : i.ingredient)
+            : Array.from({length:20},(_,idx)=>{
+                const ing=data[`strIngredient${idx+1}`]?.trim()
+                const mea=data[`strMeasure${idx+1}`]?.trim()
+                return ing ? (mea?`${mea} ${ing}`:ing) : null
+              }).filter(Boolean)
+
+          fetch(`${API}/api/nutrition`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ ingredients: ingList, servings: 4 })
+          })
+          .then(r => r.json())
+          .then(d => { if(d.totals) setNutrition(d); else setNutError(true) })
+          .catch(() => setNutError(true))
+          .finally(() => setNutLoading(false))
+        }
+
         // Fetch similar meals
         if (data?.strCategory) {
           fetch(`${API}/api/filter?c=${encodeURIComponent(data.strCategory)}`)
@@ -184,6 +211,131 @@ export default function MealDetails({ user }) {
               </a>}
             </div>
           </div>
+
+
+          {/* ── 🔥 Calorie & Nutrition Card (USDA FoodData Central) ── */}
+          {(nutLoading || nutrition || nutError) && (
+            <div className="card p-5 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-gray-900 text-lg flex items-center gap-2">
+                  🔥 Nutrition Facts
+                  <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">per serving</span>
+                </h2>
+                {nutrition && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">Servings:</span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={()=>setServings(s=>Math.max(1,s-1))}
+                        className="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold flex items-center justify-center transition-colors text-base">
+                        −
+                      </button>
+                      <span className="text-sm font-bold text-gray-800 w-5 text-center">{servings}</span>
+                      <button onClick={()=>setServings(s=>s+1)}
+                        className="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold flex items-center justify-center transition-colors text-base">
+                        +
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Skeleton while loading */}
+              {nutLoading && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-pulse">
+                  {['Calories','Protein','Carbs','Fat'].map(l => (
+                    <div key={l} className="rounded-xl bg-gray-50 p-4 text-center">
+                      <div className="h-8 bg-gray-200 rounded mb-2 mx-3"/>
+                      <div className="h-3 bg-gray-100 rounded mx-5"/>
+                      <div className="h-3 bg-gray-100 rounded mx-3 mt-1"/>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Error state */}
+              {nutError && !nutLoading && (
+                <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl border border-amber-100">
+                  <span className="text-xl mt-0.5">⚠️</span>
+                  <div>
+                    <p className="text-sm font-semibold text-amber-800">Nutrition data unavailable</p>
+                    <p className="text-xs text-amber-600 mt-0.5">USDA couldn't match these ingredients. This is normal for some dishes.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Nutrition data */}
+              {nutrition && !nutLoading && (() => {
+                const t = nutrition.totals
+                const ps = {
+                  calories: Math.round(t.calories / servings),
+                  protein:  +(t.protein  / servings).toFixed(1),
+                  carbs:    +(t.carbs    / servings).toFixed(1),
+                  fat:      +(t.fat      / servings).toFixed(1),
+                  fiber:    +(t.fiber    / servings).toFixed(1),
+                }
+                const macros = [
+                  { label:'Calories', value:ps.calories, unit:'kcal', color:'#D85A30', bg:'#FFF3EE', pct: Math.min(100, ps.calories/25) },
+                  { label:'Protein',  value:ps.protein,  unit:'g',    color:'#2563eb', bg:'#EFF6FF', pct: Math.min(100, ps.protein*2) },
+                  { label:'Carbs',    value:ps.carbs,    unit:'g',    color:'#d97706', bg:'#FFFBEB', pct: Math.min(100, ps.carbs/1.5) },
+                  { label:'Fat',      value:ps.fat,      unit:'g',    color:'#7c3aed', bg:'#F5F3FF', pct: Math.min(100, ps.fat*2.5) },
+                ]
+                return (
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                      {macros.map(m => (
+                        <div key={m.label} className="rounded-xl p-4 text-center" style={{ background:m.bg }}>
+                          <p className="text-2xl font-bold leading-none" style={{ color:m.color }}>{m.value}</p>
+                          <p className="text-xs text-gray-500 mt-1">{m.unit}</p>
+                          <p className="text-xs text-gray-400">{m.label}</p>
+                          <div className="mt-2 h-1 bg-black/10 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width:`${m.pct}%`, background:m.color }}/>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Secondary stats */}
+                    <div className="flex flex-wrap gap-3 text-xs text-gray-500 px-1 mb-3">
+                      <span>🌾 Fiber <strong className="text-gray-700">{ps.fiber}g</strong></span>
+                      <span>🧂 Sodium <strong className="text-gray-700">{Math.round(t.sodium/servings)}mg</strong></span>
+                      <span className="text-gray-300">|</span>
+                      <span>Total recipe: <strong className="text-gray-700">{t.calories} kcal</strong></span>
+                    </div>
+
+                    {/* Per-ingredient breakdown */}
+                    {nutrition.breakdown?.length > 0 && (
+                      <>
+                        <button onClick={()=>setShowBreakdown(!showBreakdown)}
+                          className="text-xs font-semibold flex items-center gap-1 mb-2"
+                          style={{ color:'#D85A30' }}>
+                          {showBreakdown ? '▲ Hide' : '▼ Show'} ingredient breakdown
+                        </button>
+                        {showBreakdown && (
+                          <div className="rounded-xl overflow-hidden border border-gray-100">
+                            <div className="grid grid-cols-5 px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-400">
+                              <span className="col-span-2">Ingredient</span>
+                              <span className="text-center">Cal</span>
+                              <span className="text-center">Prot.</span>
+                              <span className="text-center">Carbs</span>
+                            </div>
+                            {nutrition.breakdown.map((item,i) => (
+                              <div key={i} className="grid grid-cols-5 px-3 py-2 border-t border-gray-50 text-xs hover:bg-gray-50">
+                                <span className="col-span-2 text-gray-700 font-medium capitalize truncate" title={item.name}>{item.name}</span>
+                                <span className="text-center font-bold" style={{ color:'#D85A30' }}>{item.calories}</span>
+                                <span className="text-center text-gray-500">{item.protein}g</span>
+                                <span className="text-center text-gray-500">{item.carbs}g</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                    <p className="text-xs text-gray-300 mt-3">Powered by USDA FoodData Central · Free · Estimates per 100g</p>
+                  </>
+                )
+              })()}
+            </div>
+          )}
 
           <div className="grid sm:grid-cols-3 gap-6 mb-6">
             {/* Ingredients — #24 Fix C: ingredient images + checkboxes */}
