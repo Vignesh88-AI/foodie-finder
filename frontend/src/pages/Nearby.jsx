@@ -87,6 +87,7 @@ function LeafletMap({ location, places, activeAmenity }) {
 }
 
 export default function Nearby() {
+  useEffect(() => { document.title = 'Nearby Places — Dishcovery'; return () => { document.title = 'Dishcovery — Find meals you love' } }, [])
   const [location, setLocation]     = useState(null)
   const [places, setPlaces]         = useState([])
   const [loading, setLoading]       = useState(false)
@@ -133,7 +134,7 @@ export default function Nearby() {
         .sort((a,b) => a._dist - b._dist)
         .slice(0, 20)
       setPlaces(sorted)
-      if (!sorted.length) toast('No named places found. Try increasing the radius.', { icon:'🔍' })
+      if (!sorted.length) { toast('No places found. Try increasing the radius.', { icon:'🔍' }); setPlaces([]) }
       else toast.success(`Found ${sorted.length} places!`)
     } catch { toast.error('Search failed. Try again.') }
     finally { setLoading(false) }
@@ -270,6 +271,15 @@ export default function Nearby() {
                 )
               })}
             </div>
+          </motion.div>
+        )}
+
+        {/* UX-7: Empty state when search returns 0 */}
+        {!loading && location && places.length === 0 && (
+          <motion.div initial={{ opacity:0,y:16 }} animate={{ opacity:1,y:0 }} className="text-center py-16">
+            <div className="text-5xl mb-4">😕</div>
+            <h3 className="text-lg font-bold text-gray-800 mb-2">No {placeType.label} found</h3>
+            <p className="text-gray-500 text-sm mb-4">Nothing within {radius>=1000?`${(radius/1000).toFixed(1)}km`:`${radius}m`}. Try increasing the radius or a different type.</p>
           </motion.div>
         )}
 

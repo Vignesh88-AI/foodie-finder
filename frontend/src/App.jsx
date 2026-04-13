@@ -1,4 +1,4 @@
-// Dishcovery v5 — All 32 issues resolved
+// Dishcovery v6 — All bugs + UX fixes + Google Sign-In
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { onAuthStateChanged } from 'firebase/auth'
@@ -46,22 +46,20 @@ export default function App() {
 
       {user && <Navbar user={user} />}
 
-      <ErrorBoundary>
-        <Routes>
+      <Routes>
           <Route path="/"       element={user ? <Navigate to="/home" replace /> : <Landing />} />
           <Route path="/login"  element={user ? <Navigate to="/home" replace /> : <Login />} />
           <Route path="/signup" element={user ? <Navigate to="/home" replace /> : <Signup />} />
 
-          <Route path="/home"      element={<PrivateRoute user={user} loading={loading}><Home user={user} /></PrivateRoute>} />
-          <Route path="/meal/:id"  element={<PrivateRoute user={user} loading={loading}><MealDetails user={user} /></PrivateRoute>} />
-          <Route path="/favorites" element={<PrivateRoute user={user} loading={loading}><Favorites user={user} /></PrivateRoute>} />
-          <Route path="/profile"   element={<PrivateRoute user={user} loading={loading}><Profile user={user} /></PrivateRoute>} />
-          <Route path="/nearby"    element={<PrivateRoute user={user} loading={loading}><Nearby user={user} /></PrivateRoute>} />
-          <Route path="/chatbot"   element={<PrivateRoute user={user} loading={loading}><Chatbot user={user} /></PrivateRoute>} />
+          <Route path="/home"      element={<PrivateRoute user={user} loading={loading}><ErrorBoundary><Home user={user} /></ErrorBoundary></PrivateRoute>} />
+          <Route path="/meal/:id"  element={<PrivateRoute user={user} loading={loading}><ErrorBoundary><MealDetails user={user} /></ErrorBoundary></PrivateRoute>} />
+          <Route path="/favorites" element={<PrivateRoute user={user} loading={loading}><ErrorBoundary><Favorites user={user} /></ErrorBoundary></PrivateRoute>} />
+          <Route path="/profile"   element={<PrivateRoute user={user} loading={loading}><ErrorBoundary><Profile user={user} /></ErrorBoundary></PrivateRoute>} />
+          <Route path="/nearby"    element={<PrivateRoute user={user} loading={loading}><ErrorBoundary><Nearby user={user} /></ErrorBoundary></PrivateRoute>} />
+          <Route path="/chatbot"   element={<PrivateRoute user={user} loading={loading}><ErrorBoundary><Chatbot user={user} /></ErrorBoundary></PrivateRoute>} />
 
           <Route path="*" element={<NotFound />} />
-        </Routes>
-      </ErrorBoundary>
+      </Routes>
     </BrowserRouter>
   )
 }

@@ -41,3 +41,13 @@ html { scroll-behavior: smooth; }
 
 /* Scale 108 utility */
 .group-hover\:scale-108:hover { transform: scale(1.08); }
+
+/* ── UX-9: Print styles ──────────────────────────────────────────────────── */
+@media print {
+  nav, .print\:hidden, button:not(.print-show) { display: none !important; }
+  body { background: white !important; font-size: 12pt; }
+  .card { box-shadow: none !important; border: 1px solid #e5e7eb !important; }
+  img { max-width: 300px !important; }
+  h1 { font-size: 20pt !important; }
+  a { color: inherit !important; text-decoration: none !important; }
+}

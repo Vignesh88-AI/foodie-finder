@@ -6,11 +6,10 @@ import { db } from '../firebase'
 import MealCard from '../components/MealCard'
 import SkeletonCard from '../components/SkeletonCard'
 import toast from 'react-hot-toast'
-import { FiArrowLeft, FiExternalLink, FiYoutube } from 'react-icons/fi'
+import { FiArrowLeft, FiExternalLink, FiYoutube, FiShare2, FiPrinter } from 'react-icons/fi'
 import { FaHeart, FaRegHeart } from 'react-icons/fa'
 
 const API    = import.meta.env.VITE_API_URL
-const MEALDB = 'https://www.themealdb.com/api/json/v1/1'
 const getYtId = url => url?.split('v=')?.[1]?.split('&')?.[0]
 
 export default function MealDetails({ user }) {
@@ -55,6 +54,7 @@ export default function MealDetails({ user }) {
           data = json.meals?.[0]||null
         }
         setMeal(data)
+        if(data?.strMeal) document.title = `${data.strMeal} — Dishcovery`
         // Fetch nutrition from USDA (free, no key needed with DEMO_KEY)
         if (data) {
           setNutLoading(true)
@@ -89,6 +89,7 @@ export default function MealDetails({ user }) {
       finally { setLoading(false) }
     }
     fetchMeal()
+    return () => { document.title = 'Dishcovery — Find meals you love' }
   }, [id])
 
   useEffect(() => {
@@ -209,6 +210,24 @@ export default function MealDetails({ user }) {
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm border border-gray-200 text-gray-700 hover:bg-gray-50">
                 <FiExternalLink size={15}/> Source
               </a>}
+              {/* UX-4: Share button */}
+              <button onClick={async()=>{
+                const url = window.location.href
+                const title = meal.strMeal
+                if(navigator.share){
+                  try { await navigator.share({title, url}) } catch {}
+                } else {
+                  await navigator.clipboard.writeText(url)
+                  toast.success('Link copied to clipboard!')
+                }
+              }} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm border border-gray-200 text-gray-700 hover:bg-gray-50">
+                <FiShare2 size={15}/> Share
+              </button>
+              {/* UX-9: Print button */}
+              <button onClick={()=>window.print()}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm border border-gray-200 text-gray-700 hover:bg-gray-50 print:hidden">
+                <FiPrinter size={15}/> Print
+              </button>
             </div>
           </div>
 
