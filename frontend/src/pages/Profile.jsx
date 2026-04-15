@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth'
-import { collection, query, where, onSnapshot, doc, setDoc, getDoc } from 'firebase/firestore'
+import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import FoodAvatar, { getAllAvatarSVGs, getAvatarIndex } from '../components/FoodAvatar'
 import toast from 'react-hot-toast'
@@ -12,7 +12,6 @@ const AVATAR_NAMES = ['Ramen','Pizza','Sushi','Burger','Biryani','Taco','Donut',
 
 export default function Profile({ user }) {
   const navigate  = useNavigate()
-  useEffect(() => { document.title = 'Profile — Dishcovery'; return () => { document.title = 'Dishcovery — Find meals you love' } }, [])
   const [favCount, setFavCount]           = useState(0)
   const [displayName, setDisplayName]     = useState(user?.displayName||'')
   const [editingName, setEditingName]     = useState(false)
@@ -25,16 +24,6 @@ export default function Profile({ user }) {
   const [confirmPass, setConfirmPass]     = useState('')
   const [savingPass, setSavingPass]       = useState(false)
   const allAvatars = getAllAvatarSVGs(64)
-
-  // BUG-4: Load saved avatar from Firestore
-  useEffect(() => {
-    if (!user) return
-    getDoc(doc(db, 'users', user.uid)).then(snap => {
-      if (snap.exists() && snap.data().avatarIndex !== undefined) {
-        setSelectedAvatar(snap.data().avatarIndex)
-      }
-    }).catch(() => {})
-  }, [user])
 
   useEffect(() => {
     if(!user) return
@@ -177,13 +166,7 @@ export default function Profile({ user }) {
                     </motion.button>
                   ))}
                 </div>
-                <button onClick={async()=>{
-                  try {
-                    await setDoc(doc(db,'users',user.uid),{avatarIndex:selectedAvatar},{merge:true})
-                    toast.success(`${AVATAR_NAMES[selectedAvatar]} selected!`)
-                  } catch { toast.error('Could not save avatar.') }
-                  setShowAvatar(false)
-                }} className="btn-primary w-full">Save avatar</button>
+                <button onClick={()=>{toast.success(`${AVATAR_NAMES[selectedAvatar]} selected!`);setShowAvatar(false)}} className="btn-primary w-full">Save avatar</button>
               </motion.div>
             </motion.div>
           )}

@@ -1,4 +1,4 @@
-# 🍽️ Dishcovery v6
+# 🍽️ Dishcovery
 
 > **Find, explore, and cook meals you love — powered by AI, real recipe data, and your taste.**
 
@@ -304,35 +304,3 @@ All 32 issues from the original codebase resolved, plus additional runtime bugs:
 ---
 
 *Dishcovery v5 — Built by Vignesh Barik as a full-stack internship project*
-
-
----
-
-## v6 Changes
-
-### 🔴 Bugs Fixed
-- **BUG-1** — All MealDB calls now routed through backend (4 places in Home, MealDetails)
-- **BUG-2** — Login/Signup navigate to `/home` directly (no Landing page flash)
-- **BUG-3** — Forgot Password flow added to Login page
-- **BUG-4** — Avatar selection persisted to Firestore `users/{uid}` document
-- **BUG-5** — CORS restricted to frontend URL only (`FRONTEND_URL` env var)
-- **BUG-6** — Rate limiting added: 20 req/min on AI routes, 60 on search, 100 general
-- **BUG-7** — USDA nutrition now estimates actual grams from ingredient quantities (not raw per-100g)
-- **BUG-8** — Dead `const MEALDB` removed from MealDetails
-
-### 🟡 UX Fixes
-- **UX-1** — Undo toast on favourite removal (5-second undo button before delete fires)
-- **UX-2** — Clear search history button added to history dropdown
-- **UX-3** — Chatbot textarea auto-resizes as you type
-- **UX-4** — Share button on MealDetails (native share on mobile, copy link on desktop)
-- **UX-5** — Search/filter bar on Favorites page (real-time filter by name, cuisine, category)
-- **UX-7** — Proper empty state on Nearby when 0 results found
-- **UX-8** — Spoonacular quota exceeded banner shown when daily limit hit
-- **UX-9** — Print recipe button with clean print-only CSS stylesheet
-- **UX-10** — Page title updates per route (Meal name, Find meals, Profile, etc.)
-
-### 🟢 New Features
-- **Feature #1** — Google Sign-In on both Login and Signup pages
-- **Code-1** — Each route wrapped in its own ErrorBoundary (one crash doesn't kill whole app)
-- **Code-2** — Favorites uses shared `SkeletonCard` component (no duplicate definition)
-- **Code-3** — Favorites header redesigned with emoji + count + sort indicator

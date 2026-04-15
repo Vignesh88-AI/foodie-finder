@@ -10,6 +10,7 @@ import { FaHeart } from 'react-icons/fa'
 import { useNavigate } from 'react-router-dom'
 
 const API      = import.meta.env.VITE_API_URL
+const MEALDB   = 'https://www.themealdb.com/api/json/v1/1'
 const PAGE_SIZE = 20
 
 // #19 — All 37 MealDB countries
@@ -75,7 +76,7 @@ async function spoonSearch(q, offset=0, cuisine=null, diet=null) {
   if (cuisine) url+=`&cuisine=${encodeURIComponent(cuisine)}`
   if (diet) url+=`&diet=${encodeURIComponent(diet)}`
   const res = await fetch(url); if(!res.ok) throw new Error('Spoon failed')
-  const data = await res.json(); if(data.error === 'quota_exceeded') throw new Error('quota_exceeded'); if(data.error) throw new Error(data.error)
+  const data = await res.json(); if(data.error) throw new Error(data.error)
   return { meals:(data.results||[]).map(spoonToMeal), total:data.totalResults||0, hasMore:offset+PAGE_SIZE<(data.totalResults||0), nextOffset:offset+PAGE_SIZE }
 }
 async function spoonCuisine(cuisine, offset=0) {
@@ -86,10 +87,6 @@ async function spoonCuisine(cuisine, offset=0) {
 }
 
 const getSearchHistory = () => { try { return JSON.parse(localStorage.getItem('dishcovery_search_history')||'[]') } catch { return [] } }
-const clearSearchHistory = () => {
-  localStorage.removeItem('dishcovery_search_history')
-}
-
 const saveSearchHistory = (q) => {
   const h = getSearchHistory()
   const updated = [q, ...h.filter(x=>x!==q)].slice(0,5)
@@ -160,7 +157,7 @@ function MealOfDay({ navigate }) {
       const cached = JSON.parse(localStorage.getItem('dishcovery_meal_of_day')||'{}')
       if (cached.date===today && cached.meal) { setMeal(cached.meal); return }
     } catch {}
-    fetch(`${API}/api/meal/random`).then(r=>r.json()).then(data=>{
+    fetch(`${MEALDB}/random.php`).then(r=>r.json()).then(data=>{
       const m = data.meals?.[0]
       if (m) {
         setMeal(m)
@@ -194,7 +191,6 @@ function MealOfDay({ navigate }) {
 
 export default function Home({ user }) {
   const navigate = useNavigate()
-  useEffect(() => { document.title = 'Find meals — Dishcovery' }, [])
   const [meals, setMeals]           = useState([])
   const [favorites, setFavorites]   = useState({})
   const [search, setSearch]         = useState('')
@@ -212,8 +208,6 @@ export default function Home({ user }) {
   const [totalCount, setTotalCount] = useState(0)
   const [apiSource, setApiSource]   = useState('')
   const [mode, setMode]             = useState('popular')
-  const [spoonQuotaExceeded, setSpoonQuotaExceeded] = useState(false)
-  const [slowBackend, setSlowBackend] = useState(false)
   const searchRef = useRef(null)
 
   useEffect(() => {
@@ -260,14 +254,12 @@ export default function Home({ user }) {
     } catch {}
     // MealDB fallback
     try {
-      const res = await fetch(`${API}/api/popular`)
-      const popData = await res.json()
-      const combined = (popData.meals || []).sort(()=>Math.random()-0.5)
+      const areas = ['Indian','Italian','Chinese','Mexican','Japanese','Thai','British','French','American','Greek']
+      const results = await Promise.all(areas.map(a=>fetch(`${MEALDB}/filter.php?a=${a}`).then(r=>r.json()).catch(()=>({meals:[]}))))
       const combined = results.flatMap((r,i)=>(r.meals||[]).map(m=>({...m,strArea:areas[i]}))).sort(()=>Math.random()-0.5)
       setMeals(combined.slice(0,PAGE_SIZE)); setHasMore(combined.length>PAGE_SIZE)
       setNextOffset(PAGE_SIZE); setTotalCount(combined.length); setApiSource('mealdb')
       try { sessionStorage.setItem('dishcovery_popular',JSON.stringify({meals:combined,ts:Date.now()})) } catch {}
-    
     } catch { toast.error('Could not load meals.') }
     finally { setLoading(false) }
   }
@@ -280,10 +272,10 @@ export default function Home({ user }) {
     saveSearchHistory(q); setSearchHistory(getSearchHistory())
 
     // 1. Spoonacular
-    try { const res=await spoonSearch(q,0); if(res.meals.length>0){setSpoonQuotaExceeded(false);setMeals(res.meals);setHasMore(res.hasMore);setNextOffset(res.nextOffset);setTotalCount(res.total);setApiSource('spoon');setLoading(false);return} } catch(spErr){ if(spErr.message==='quota_exceeded') setSpoonQuotaExceeded(true) }
+    try { const res=await spoonSearch(q,0); if(res.meals.length>0){setMeals(res.meals);setHasMore(res.hasMore);setNextOffset(res.nextOffset);setTotalCount(res.total);setApiSource('spoon');setLoading(false);return} } catch {}
     // 3. MealDB
     try {
-      const r=await fetch(`${API}/api/search?q=${encodeURIComponent(q)}`).then(r=>r.json())
+      const r=await fetch(`${MEALDB}/search.php?s=${encodeURIComponent(q)}`).then(r=>r.json())
       const found=r.meals||[]
       setMeals(found); setHasMore(false); setTotalCount(found.length); setApiSource('mealdb')
       // #20 — AI suggestion when no results
@@ -371,7 +363,7 @@ export default function Home({ user }) {
         .then(async () => {
           try { const res=await spoonSearch(q,0); if(res.meals.length>0){setMeals(res.meals);setHasMore(res.hasMore);setNextOffset(res.nextOffset);setTotalCount(res.total);setApiSource('spoon');return} } catch {}
           try {
-            const r=await fetch(`${API}/api/search?q=${encodeURIComponent(q)}`).then(r=>r.json())
+            const r=await fetch(`${MEALDB}/search.php?s=${encodeURIComponent(q)}`).then(r=>r.json())
             const found=r.meals||[]; setMeals(found); setHasMore(false); setTotalCount(found.length); setApiSource('mealdb')
           } catch {}
         })
@@ -421,10 +413,6 @@ export default function Home({ user }) {
                       <FiSearch size={13} className="text-gray-400 flex-shrink-0"/>{q}
                     </button>
                   ))}
-                  <button onClick={()=>{ clearSearchHistory(); setSearchHistory([]); setShowHistory(false) }}
-                    className="w-full px-4 py-2 text-xs text-gray-400 hover:text-red-500 hover:bg-gray-50 transition-colors text-center border-t border-gray-50">
-                    Clear history
-                  </button>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -444,15 +432,6 @@ export default function Home({ user }) {
           )}
         </div>
       </div>
-
-      {/* UX-8: Spoonacular quota exceeded banner */}
-      {spoonQuotaExceeded && (
-        <div className="bg-amber-50 border-b border-amber-100 px-4 py-2.5 text-center">
-          <p className="text-xs text-amber-700 font-medium">
-            📊 Daily Spoonacular quota reached — showing MealDB results. Full search resumes tomorrow.
-          </p>
-        </div>
-      )}
 
       {/* #11 — Meal of the Day */}
       {!activeQuery && !cuisine && !diet && (

@@ -78,7 +78,6 @@ function SafeMarkdown({ content }) {
 
 export default function Chatbot({ user }) {
   const userName = user?.displayName?.split(' ')[0] || 'Chef'
-  useEffect(() => { document.title = 'Chef Dish — Dishcovery'; return () => { document.title = 'Dishcovery — Find meals you love' } }, [])
   const [userFavs, setUserFavs] = useState([])
   const [messages, setMessages] = useState([])
   const [sessions, setSessions] = useState([])
@@ -314,8 +313,7 @@ export default function Chatbot({ user }) {
             placeholder="Ask Chef Dish anything about cooking…"
             rows={1} style={{ flex:1,border:'1.5px solid #e5e7eb',borderRadius:16,padding:'12px 16px',fontSize:14,outline:'none',resize:'none',minHeight:48,maxHeight:120,lineHeight:1.5,fontFamily:'inherit',background:'#fafafa' }}
             onFocus={e=>e.target.style.borderColor='#D85A30'}
-            onBlur={e=>e.target.style.borderColor='#e5e7eb'}
-            onInput={e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,120)+'px' }}/>
+            onBlur={e=>e.target.style.borderColor='#e5e7eb'}/>
           <motion.button whileTap={{ scale:0.88 }} onClick={()=>sendMessage()} disabled={!input.trim()||loading}
             style={{ width:48,height:48,borderRadius:14,border:'none',cursor:'pointer',background:input.trim()?'#D85A30':'#e5e7eb',color:'white',display:'flex',alignItems:'center',justifyContent:'center',transition:'all .15s',flexShrink:0,boxShadow:input.trim()?'0 4px 12px rgba(216,90,48,0.3)':'none' }}>
             <FiSend size={18}/>

@@ -6,10 +6,11 @@ import { db } from '../firebase'
 import MealCard from '../components/MealCard'
 import SkeletonCard from '../components/SkeletonCard'
 import toast from 'react-hot-toast'
-import { FiArrowLeft, FiExternalLink, FiYoutube, FiShare2, FiPrinter } from 'react-icons/fi'
+import { FiArrowLeft, FiExternalLink, FiYoutube } from 'react-icons/fi'
 import { FaHeart, FaRegHeart } from 'react-icons/fa'
 
 const API    = import.meta.env.VITE_API_URL
+const MEALDB = 'https://www.themealdb.com/api/json/v1/1'
 const getYtId = url => url?.split('v=')?.[1]?.split('&')?.[0]
 
 export default function MealDetails({ user }) {
@@ -28,6 +29,7 @@ export default function MealDetails({ user }) {
   const [nutError, setNutError]     = useState(false)
   const [servings, setServings]     = useState(4)
   const [showBreakdown, setShowBreakdown] = useState(false)
+  const fetchMealMountedRef = useRef({ current: true }) // unmount guard for nutrition fetch
 
   useEffect(() => {
     const fetchMeal = async () => {
@@ -54,8 +56,8 @@ export default function MealDetails({ user }) {
           data = json.meals?.[0]||null
         }
         setMeal(data)
-        if(data?.strMeal) document.title = `${data.strMeal} — Dishcovery`
-        // Fetch nutrition from USDA (free, no key needed with DEMO_KEY)
+        // Fetch nutrition from USDA — with unmount guard so state
+        // is never set on a component that has already navigated away
         if (data) {
           setNutLoading(true)
           const ingList = data._ingredients
@@ -66,15 +68,27 @@ export default function MealDetails({ user }) {
                 return ing ? (mea?`${mea} ${ing}`:ing) : null
               }).filter(Boolean)
 
+          // mounted flag — set to false when component unmounts
+          // so we never call setState on a dead component
+          const stillMounted = { current: true }
+          fetchMealMountedRef.current = stillMounted
+
           fetch(`${API}/api/nutrition`, {
             method:'POST',
             headers:{'Content-Type':'application/json'},
             body: JSON.stringify({ ingredients: ingList, servings: 4 })
           })
-          .then(r => r.json())
-          .then(d => { if(d.totals) setNutrition(d); else setNutError(true) })
-          .catch(() => setNutError(true))
-          .finally(() => setNutLoading(false))
+          .then(r => { if (!r.ok) throw new Error('network'); return r.json() })
+          .then(d => {
+            if (!stillMounted.current) return
+            if (d.totals && d.totals.calories > 0) {
+              setNutrition(d)
+            } else {
+              setNutError(true)
+            }
+          })
+          .catch(() => { if (stillMounted.current) setNutError(true) })
+          .finally(() => { if (stillMounted.current) setNutLoading(false) })
         }
 
         // Fetch similar meals
@@ -89,7 +103,12 @@ export default function MealDetails({ user }) {
       finally { setLoading(false) }
     }
     fetchMeal()
-    return () => { document.title = 'Dishcovery — Find meals you love' }
+    return () => {
+      // Signal any in-flight nutrition fetch to discard its result
+      if (fetchMealMountedRef.current) {
+        fetchMealMountedRef.current.current = false
+      }
+    }
   }, [id])
 
   useEffect(() => {
@@ -210,24 +229,6 @@ export default function MealDetails({ user }) {
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm border border-gray-200 text-gray-700 hover:bg-gray-50">
                 <FiExternalLink size={15}/> Source
               </a>}
-              {/* UX-4: Share button */}
-              <button onClick={async()=>{
-                const url = window.location.href
-                const title = meal.strMeal
-                if(navigator.share){
-                  try { await navigator.share({title, url}) } catch {}
-                } else {
-                  await navigator.clipboard.writeText(url)
-                  toast.success('Link copied to clipboard!')
-                }
-              }} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm border border-gray-200 text-gray-700 hover:bg-gray-50">
-                <FiShare2 size={15}/> Share
-              </button>
-              {/* UX-9: Print button */}
-              <button onClick={()=>window.print()}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm border border-gray-200 text-gray-700 hover:bg-gray-50 print:hidden">
-                <FiPrinter size={15}/> Print
-              </button>
             </div>
           </div>
 
