@@ -29,9 +29,10 @@ export default function MealDetails({ user }) {
   const [nutError, setNutError]     = useState(false)
   const [servings, setServings]     = useState(4)
   const [showBreakdown, setShowBreakdown] = useState(false)
-  const fetchMealMountedRef = useRef({ current: true }) // unmount guard for nutrition fetch
 
   useEffect(() => {
+    let cancelled = false  // unmount guard — simple boolean, no ref needed
+
     const fetchMeal = async () => {
       setLoading(true); setChecked({}); setNutrition(null); setNutError(false); setServings(4); setShowBreakdown(false)
       try {
@@ -68,11 +69,6 @@ export default function MealDetails({ user }) {
                 return ing ? (mea?`${mea} ${ing}`:ing) : null
               }).filter(Boolean)
 
-          // mounted flag — set to false when component unmounts
-          // so we never call setState on a dead component
-          const stillMounted = { current: true }
-          fetchMealMountedRef.current = stillMounted
-
           fetch(`${API}/api/nutrition`, {
             method:'POST',
             headers:{'Content-Type':'application/json'},
@@ -80,15 +76,15 @@ export default function MealDetails({ user }) {
           })
           .then(r => { if (!r.ok) throw new Error('network'); return r.json() })
           .then(d => {
-            if (!stillMounted.current) return
+            if (cancelled) return
             if (d.totals && d.totals.calories > 0) {
               setNutrition(d)
             } else {
               setNutError(true)
             }
           })
-          .catch(() => { if (stillMounted.current) setNutError(true) })
-          .finally(() => { if (stillMounted.current) setNutLoading(false) })
+          .catch(() => { if (!cancelled) setNutError(true) })
+          .finally(() => { if (!cancelled) setNutLoading(false) })
         }
 
         // Fetch similar meals
@@ -103,12 +99,7 @@ export default function MealDetails({ user }) {
       finally { setLoading(false) }
     }
     fetchMeal()
-    return () => {
-      // Signal any in-flight nutrition fetch to discard its result
-      if (fetchMealMountedRef.current) {
-        fetchMealMountedRef.current.current = false
-      }
-    }
+    return () => { cancelled = true }
   }, [id])
 
   useEffect(() => {
