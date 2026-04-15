@@ -206,8 +206,7 @@ app.post('/api/nutrition', async (req, res) => {
       .map(r => r.value)
 
     if (!breakdown.length) {
-      // Return 200 so frontend .then() fires (not .catch()) and can show the error state
-      return res.json({ totals: null, breakdown: [], error: 'No nutrition data found' })
+      return res.status(404).json({ error: 'Could not find nutrition data for these ingredients' })
     }
 
     const totals = breakdown.reduce((acc, f) => ({

@@ -31,8 +31,6 @@ export default function MealDetails({ user }) {
   const [showBreakdown, setShowBreakdown] = useState(false)
 
   useEffect(() => {
-    let cancelled = false  // unmount guard — simple boolean, no ref needed
-
     const fetchMeal = async () => {
       setLoading(true); setChecked({}); setNutrition(null); setNutError(false); setServings(4); setShowBreakdown(false)
       try {
@@ -57,8 +55,7 @@ export default function MealDetails({ user }) {
           data = json.meals?.[0]||null
         }
         setMeal(data)
-        // Fetch nutrition from USDA — with unmount guard so state
-        // is never set on a component that has already navigated away
+        // Fetch nutrition from USDA (free, no key needed with DEMO_KEY)
         if (data) {
           setNutLoading(true)
           const ingList = data._ingredients
@@ -74,17 +71,10 @@ export default function MealDetails({ user }) {
             headers:{'Content-Type':'application/json'},
             body: JSON.stringify({ ingredients: ingList, servings: 4 })
           })
-          .then(r => { if (!r.ok) throw new Error('network'); return r.json() })
-          .then(d => {
-            if (cancelled) return
-            if (d.totals && d.totals.calories > 0) {
-              setNutrition(d)
-            } else {
-              setNutError(true)
-            }
-          })
-          .catch(() => { if (!cancelled) setNutError(true) })
-          .finally(() => { if (!cancelled) setNutLoading(false) })
+          .then(r => r.json())
+          .then(d => { if(d.totals) setNutrition(d); else setNutError(true) })
+          .catch(() => setNutError(true))
+          .finally(() => setNutLoading(false))
         }
 
         // Fetch similar meals
@@ -99,7 +89,6 @@ export default function MealDetails({ user }) {
       finally { setLoading(false) }
     }
     fetchMeal()
-    return () => { cancelled = true }
   }, [id])
 
   useEffect(() => {
